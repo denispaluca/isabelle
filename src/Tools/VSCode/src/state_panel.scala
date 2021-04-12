@@ -63,14 +63,28 @@ class State_Panel private(val server: Language_Server)
     new Query_Operation(server.editor, (), "print_state", _ => (),
       (snapshot, results, body) =>
         if (output_active.value) {
-          val text = server.resources.output_pretty_message(Pretty.separate(body))
+          val bodyStyle: String = cat_lines(
+            List(
+              "body {",
+              "  color: var(--vscode-editor-foreground);",
+              "  background-color: var(--vscode-editor-background);",
+              "}",
+              ".source {",
+              "  background-color: var(--vscode-editor-background);",
+              "}",
+            )
+          )
+          val htmlStyle = HTML.style(HTML.fonts_css()+ "\n\n" + File.read(HTML.isabelle_css) + "\n\n" + bodyStyle)
+          val htmlBody = Presentation.make_html(Presentation.elements2, (_, _) => None, body)
           val content =
             HTML.output_document(
-              List(HTML.style(HTML.fonts_css()),
-                HTML.style_file(HTML.isabelle_css),
-                HTML.script(controls_script)),
-              List(controls, HTML.source(text)),
+              List(
+                htmlStyle,
+                HTML.script(controls_script),
+                HTML.title("State")),
+              List(controls, HTML.source(htmlBody)),
               css = "", structural = true)
+
           output(content)
         })
 
