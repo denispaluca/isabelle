@@ -2,8 +2,9 @@
 
 import * as library from './library'
 import * as protocol from './protocol'
+import * as path from 'path';
 import { LanguageClient } from 'vscode-languageclient';
-import { Uri, ExtensionContext, window, WebviewPanel, ViewColumn } from 'vscode'
+import { Uri, ExtensionContext, window, WebviewPanel, ViewColumn, Webview } from 'vscode'
 
 
 let language_client: LanguageClient
@@ -17,6 +18,7 @@ class Panel
 {
   private state_id: number
   private webview_panel: WebviewPanel
+  private _extensionPath: string
 
   public get_id(): number { return this.state_id }
   public check_id(id: number): boolean { return this.state_id == id }
@@ -24,7 +26,7 @@ class Panel
   public set_content(id: number, body: string)
   {
     this.state_id = id
-    this.webview_panel.webview.html = body
+    this.webview_panel.webview.html = this._getHtmlForWebview(this.webview_panel.webview, body);
   }
 
   public reveal()
@@ -32,8 +34,9 @@ class Panel
     this.webview_panel.reveal(panel_column())
   }
 
-  constructor()
+  constructor(extensionPath: string)
   {
+    this._extensionPath = extensionPath;
     this.webview_panel =
       window.createWebviewPanel("isabelle-state", "State", panel_column(),
         {
@@ -61,6 +64,34 @@ class Panel
         }
       })
   }
+
+  private _getHtmlForWebview(webview: Webview, content: string): string {
+		// Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
+		const scriptUri = webview.asWebviewUri(Uri.file(path.join(this._extensionPath, 'src/media', 'main.js')));
+
+		// Do the same for the stylesheet.
+		const styleVSCodeUri = webview.asWebviewUri(Uri.file(path.join(this._extensionPath, 'src/media', 'vscode.css')));
+
+		return `<!DOCTYPE html>
+			<html>
+			<head>
+				<meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="${styleVSCodeUri}" rel="stylesheet" type="text/css">
+				<title>State Panel</title>
+			</head>
+			<body>
+        <div>
+          <input type="checkbox" id="auto_update" />
+          <label for="auto_update">Auto update</label>
+          <button id="update_button">Update</button>
+          <button id="locate_button">Locate</button>
+        </div>
+        ${content}
+				<script src="${scriptUri}"></script>
+			</body>
+			</html>`;
+	}
 }
 
 let panel: Panel
@@ -86,7 +117,7 @@ export function setup(context: ExtensionContext, client: LanguageClient)
   language_client = client
   language_client.onNotification(protocol.state_output_type, params =>
     {
-      if (!panel) { panel = new Panel() }
+      if (!panel) { panel = new Panel(context.extensionPath) }
       panel.set_content(params.id, params.content)
     })
 }

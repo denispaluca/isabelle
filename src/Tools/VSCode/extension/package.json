@@ -545,10 +545,11 @@
         "@types/mocha": "^2.2.48",
         "@types/node": "^10.11.0",
         "mocha": "^3.5.3",
-        "typescript": "^3.9.9",
-        "vscode": "^1.1.36"
+        "typescript": "^3.9.9"
     },
     "dependencies": {
+        "@types/vscode": "^1.55.0",
+        "path": "^0.12.7",
         "vscode-languageclient": "~5.2.1",
         "vscode-languageserver-types": "~3.16.0"
     }
