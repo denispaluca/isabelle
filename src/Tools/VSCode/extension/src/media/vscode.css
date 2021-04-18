@@ -47,7 +47,7 @@ code {
 button {
 	border: none;
 	padding: var(--input-padding-vertical) var(--input-padding-horizontal);
-	width: 100%;
+	width: 20%;
 	text-align: center;
 	outline: 1px solid transparent;
 	outline-offset: 2px !important;
@@ -88,4 +88,16 @@ textarea {
 input::placeholder,
 textarea::placeholder {
 	color: var(--vscode-input-placeholderForeground);
+}
+
+#controls {
+	display: flex;
+	flex-direction: row;
+	justify-content: flex-end;
+	align-items: center;
+}
+
+#controls > *{
+	margin-left: 5px;
+	margin-top: 5px;
 }

@@ -85,7 +85,7 @@ class Panel
 				<title>State Panel</title>
 			</head>
 			<body>
-        <div>
+        <div id="controls">
           <input type="checkbox" id="auto_update" />
           <label for="auto_update">Auto update</label>
           <button id="update_button">Update</button>
