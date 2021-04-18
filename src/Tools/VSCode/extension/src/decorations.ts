@@ -35,7 +35,7 @@ const dotted_colors = [
   "warning"
 ]
 
-const text_colors = [
+export const text_colors = [
   "main",
   "keyword1",
   "keyword2",

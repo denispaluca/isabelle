@@ -74,8 +74,8 @@ class State_Panel private(val server: Language_Server)
               "}",
             )
           )
-          val htmlStyle = HTML.style(HTML.fonts_css()+ "\n\n" + File.read(HTML.isabelle_css) + "\n\n" + bodyStyle)
-          val htmlBody = Presentation.make_html(Presentation.elements2, (_, _) => None, body)
+          val htmlStyle = HTML.style(HTML.fonts_css()+ "\n\n" + File.read(HTML.isabelle_css))
+          val htmlBody = Presentation.make_html(Presentation.elements1, (_, _) => None, body)
           val content =
             HTML.output_document(
               List(
@@ -85,7 +85,7 @@ class State_Panel private(val server: Language_Server)
               List(controls, HTML.source(htmlBody)),
               css = "", structural = true)
 
-          output(content)
+          output(HTML.source(htmlBody).toString())
         })
 
   def locate(): Unit = print_state.locate_query()

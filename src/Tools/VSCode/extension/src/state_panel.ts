@@ -5,6 +5,7 @@ import * as protocol from './protocol'
 import * as path from 'path';
 import { LanguageClient } from 'vscode-languageclient';
 import { Uri, ExtensionContext, window, WebviewPanel, ViewColumn, Webview } from 'vscode'
+import { text_colors } from './decorations';
 
 
 let language_client: LanguageClient
@@ -78,6 +79,9 @@ class Panel
 				<meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link href="${styleVSCodeUri}" rel="stylesheet" type="text/css">
+        <style>
+          ${this._getDecorations()}
+        </style>
 				<title>State Panel</title>
 			</head>
 			<body>
@@ -92,6 +96,16 @@ class Panel
 			</body>
 			</html>`;
 	}
+
+  private _getDecorations(): string{
+    let style: string = '';
+    for(const key of text_colors){
+      style += `body.vscode-light .${key} { color: ${library.get_color(key, true)} }\n`;
+      style += `body.vscode-dark .${key} { color: ${library.get_color(key, false)} }\n`;
+    }
+
+    return style;
+  }
 }
 
 let panel: Panel
