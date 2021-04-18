@@ -63,29 +63,14 @@ class State_Panel private(val server: Language_Server)
     new Query_Operation(server.editor, (), "print_state", _ => (),
       (snapshot, results, body) =>
         if (output_active.value) {
-          val bodyStyle: String = cat_lines(
-            List(
-              "body {",
-              "  color: var(--vscode-editor-foreground);",
-              "  background-color: var(--vscode-editor-background);",
-              "}",
-              ".source {",
-              "  background-color: var(--vscode-editor-background);",
-              "}",
-            )
-          )
-          val htmlStyle = HTML.style(HTML.fonts_css()+ "\n\n" + File.read(HTML.isabelle_css))
-          val htmlBody = Presentation.make_html(Presentation.elements1, (_, _) => None, body)
-          val content =
-            HTML.output_document(
-              List(
-                htmlStyle,
-                HTML.script(controls_script),
-                HTML.title("State")),
-              List(controls, HTML.source(htmlBody)),
-              css = "", structural = true)
+          if(body.nonEmpty){
+            val htmlBody = Presentation.make_html(
+              Presentation.elements2,
+              (_, _) => None,
+              Pretty.separate(body))
 
-          output(HTML.source(htmlBody).toString())
+            output(HTML.source(htmlBody).toString())
+          }
         })
 
   def locate(): Unit = print_state.locate_query()
