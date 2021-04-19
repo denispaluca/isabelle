@@ -104,44 +104,6 @@ class State_Panel private(val server: Language_Server)
   }
 
 
-  /* controls */
-
-  private def controls_script =
-"""
-const vscode = acquireVsCodeApi();
-
-function invoke_auto_update(enabled)
-{ vscode.postMessage({'command': 'auto_update', 'enabled': enabled}) }
-
-function invoke_update()
-{ vscode.postMessage({'command': 'update'}) }
-
-function invoke_locate()
-{ vscode.postMessage({'command': 'locate'}) }
-"""
-
-  private def auto_update_button: XML.Elem =
-    HTML.GUI.checkbox(HTML.text("Auto update"),
-      name = "auto_update",
-      tooltip = "Indicate automatic update following cursor movement",
-      selected = auto_update_enabled.value,
-      script = "invoke_auto_update(this.checked)")
-
-  private def update_button: XML.Elem =
-    HTML.GUI.button(List(HTML.bold(HTML.text("Update"))),
-      name = "update",
-      tooltip = "Update display according to the command at cursor position",
-      script = "invoke_update()")
-
-  private def locate_button: XML.Elem =
-    HTML.GUI.button(HTML.text("Locate"),
-      name = "locate",
-      tooltip = "Locate printed command within source text",
-      script = "invoke_locate()")
-
-  private def controls: XML.Elem =
-    HTML.Wrap_Panel(List(auto_update_button, update_button, locate_button))
-
 
   /* main */
 
