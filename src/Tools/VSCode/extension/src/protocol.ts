@@ -52,8 +52,9 @@ export const dynamic_output_type =
 
 export interface State_Output
 {
-  id: number
-  content: string
+  id: number;
+  content: string;
+  auto_update: boolean;
 }
 
 export const state_output_type =

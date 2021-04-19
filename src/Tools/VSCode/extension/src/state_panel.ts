@@ -24,10 +24,10 @@ class Panel
   public get_id(): number { return this.state_id }
   public check_id(id: number): boolean { return this.state_id == id }
 
-  public set_content(id: number, body: string)
+  public set_content(state: protocol.State_Output)
   {
-    this.state_id = id
-    this.webview_panel.webview.html = this._getHtmlForWebview(this.webview_panel.webview, body);
+    this.state_id = state.id
+    this.webview_panel.webview.html = this._getHtmlForWebview(state.content, state.auto_update);
   }
 
   public reveal()
@@ -66,13 +66,11 @@ class Panel
       })
   }
 
-  private _getHtmlForWebview(webview: Webview, content: string): string {
-		// Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
+  private _getHtmlForWebview(content: string, auto_update: boolean): string {
+    const webview = this.webview_panel.webview;
 		const scriptUri = webview.asWebviewUri(Uri.file(path.join(this._extensionPath, 'src/media', 'main.js')));
-
-		// Do the same for the stylesheet.
 		const styleVSCodeUri = webview.asWebviewUri(Uri.file(path.join(this._extensionPath, 'src/media', 'vscode.css')));
-
+    const checked = auto_update ? 'checked' : ''
 		return `<!DOCTYPE html>
 			<html>
 			<head>
@@ -86,7 +84,7 @@ class Panel
 			</head>
 			<body>
         <div id="controls">
-          <input type="checkbox" id="auto_update" />
+          <input type="checkbox" id="auto_update" ${checked}/>
           <label for="auto_update">Auto update</label>
           <button id="update_button">Update</button>
           <button id="locate_button">Locate</button>
@@ -131,7 +129,9 @@ export function setup(context: ExtensionContext, client: LanguageClient)
   language_client = client
   language_client.onNotification(protocol.state_output_type, params =>
     {
-      if (!panel) { panel = new Panel(context.extensionPath) }
-      panel.set_content(params.id, params.content)
+      if (!panel) { 
+        panel = new Panel(context.extensionPath) 
+      }
+      panel.set_content(params)
     })
 }

@@ -549,8 +549,8 @@ object LSP
 
   object State_Output
   {
-    def apply(id: Counter.ID, content: String): JSON.T =
-      Notification("PIDE/state_output", JSON.Object("id" -> id, "content" -> content))
+    def apply(id: Counter.ID, content: String, auto_update: Boolean): JSON.T =
+      Notification("PIDE/state_output", JSON.Object("id" -> id, "content" -> content, "auto_update" -> auto_update))
   }
 
   class State_Id_Notification(name: String)

@@ -52,7 +52,7 @@ class State_Panel private(val server: Language_Server)
   val id: Counter.ID = State_Panel.make_id()
 
   private def output(content: String): Unit =
-    server.channel.write(LSP.State_Output(id, content))
+    server.channel.write(LSP.State_Output(id, content, auto_update_enabled.value))
 
 
   /* query operation */
