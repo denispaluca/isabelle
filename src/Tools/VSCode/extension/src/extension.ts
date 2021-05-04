@@ -30,7 +30,7 @@ export function activate(context: ExtensionContext)
     window.showErrorMessage("Missing user settings: isabelle.home")
   else {
     const isabelle_tool = isabelle_home + "/bin/isabelle"
-    const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions", "-L", "/home/denis/Desktop/isabelle_server.log"]
+    const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions"]
 
     const server_options: ServerOptions =
       library.platform_is_windows() ?
@@ -40,6 +40,7 @@ export function activate(context: ExtensionContext)
           args: ["-l", isabelle_tool, "vscode_server"].concat(standard_args, isabelle_args) } :
         { command: isabelle_tool,
           args: ["vscode_server"].concat(standard_args, isabelle_args) };
+          
     const language_client_options: LanguageClientOptions = {
       documentSelector: [
         { language: "isabelle", scheme: "file" },

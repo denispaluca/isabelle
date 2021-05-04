@@ -1,6 +1,6 @@
 'use strict';
 
-import { Position, Range, MarkedString, DecorationOptions, DecorationRenderOptions } from 'vscode'
+import { MarkdownString } from 'vscode'
 import { NotificationType } from 'vscode-languageclient';
 import * as symbol from './symbol'
 
@@ -9,7 +9,7 @@ import * as symbol from './symbol'
 
 export interface DecorationOpts {
   range: number[],
-  hover_message?: MarkedString | MarkedString[]
+  hover_message?: MarkdownString | MarkdownString[]
 }
 
 export interface Decoration
