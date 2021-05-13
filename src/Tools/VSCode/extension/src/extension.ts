@@ -1,7 +1,6 @@
 'use strict';
 
 import * as path from 'path';
-import * as fs from 'fs';
 import * as library from './library'
 import * as decorations from './decorations';
 import * as preview_panel from './preview_panel';

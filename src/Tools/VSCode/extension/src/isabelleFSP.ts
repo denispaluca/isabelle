@@ -47,6 +47,7 @@ export class IsabelleFSP implements FileSystemProvider {
 
     root = new Directory('');
     public static readonly schema = 'isabelle';
+    private pathMap = new Map<string, string>();
 
     public static register(context: ExtensionContext) {
         const isabelleFSP = new IsabelleFSP();
@@ -68,10 +69,6 @@ export class IsabelleFSP implements FileSystemProvider {
                 if(document.languageId !== 'isabelle') return;
 
                 commands.executeCommand('workbench.action.closeActiveEditor');
-                
-                isabelleFSP.onDidChangeFile(async f => {
-                    const docu = await workspace.openTextDocument(f[0].uri);
-                })
 
                 const newUri = await isabelleFSP.createFromOriginal(document);
                 await window.showTextDocument(newUri);
@@ -85,6 +82,7 @@ export class IsabelleFSP implements FileSystemProvider {
 
         const newUri = Uri.parse(`${IsabelleFSP.schema}:/${path.basename(doc.fileName)}`);
         this.writeFile(newUri, data, {create: true, overwrite: true});
+        this.pathMap.set(newUri.path, doc.uri.path);
 
         return newUri;
     }
@@ -112,7 +110,7 @@ export class IsabelleFSP implements FileSystemProvider {
         throw FileSystemError.FileNotFound();
     }
 
-    writeFile(uri: Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): void {
+    async writeFile(uri: Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
         const basename = path.posix.basename(uri.path);
         const parent = this._lookupParentDirectory(uri);
         let entry = parent.entries.get(basename);
@@ -125,16 +123,24 @@ export class IsabelleFSP implements FileSystemProvider {
         if (entry && options.create && !options.overwrite) {
             throw FileSystemError.FileExists(uri);
         }
-        if (!entry) {
-            entry = new File(basename);
-            parent.entries.set(basename, entry);
-            this._fireSoon({ type: FileChangeType.Created, uri });
+        if(entry){
+            entry.mtime = Date.now();
+            entry.size = content.byteLength;
+            entry.data = content;
+            
+            const originUri = Uri.parse(this.pathMap.get(uri.path));
+            await workspace.fs.writeFile(originUri, content);
+    
+            this._fireSoon({ type: FileChangeType.Changed, uri });
+            return;
         }
+
+        entry = new File(basename);
+        parent.entries.set(basename, entry);
         entry.mtime = Date.now();
         entry.size = content.byteLength;
         entry.data = content;
-
-        this._fireSoon({ type: FileChangeType.Changed, uri });
+        this._fireSoon({ type: FileChangeType.Created, uri });
     }
 
     // --- manage files/folders
