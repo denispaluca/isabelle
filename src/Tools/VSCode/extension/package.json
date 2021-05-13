@@ -23,6 +23,7 @@
         "Programming Languages"
     ],
     "activationEvents": [
+        "onCustomEditor:isabelle.customEditor",
         "onLanguage:isabelle",
         "onLanguage:isabelle-ml",
         "onLanguage:bibtex",
@@ -31,6 +32,17 @@
     ],
     "main": "./out/src/extension",
     "contributes": {
+        "customEditors": [
+            {
+                "viewType": "isabelle.customEditor",
+                "displayName": "Isabelle",
+                "selector": [
+                    {
+                        "filenamePattern": "*.thy"
+                    }
+                ]
+            }
+        ],
         "commands": [
             {
                 "command": "isabelle.state",

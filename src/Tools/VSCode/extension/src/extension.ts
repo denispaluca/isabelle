@@ -13,6 +13,7 @@ import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, wor
   commands, languages } from 'vscode';
 import { LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, TransportKind,
   NotificationType } from 'vscode-languageclient';
+import { IsabelleEditorProvider } from './isabelle_editor';
 
 
 let last_caret_update: protocol.Caret_Update = {}
@@ -23,6 +24,8 @@ export function activate(context: ExtensionContext)
   const isabelle_args = library.get_configuration<Array<string>>("args")
   const cygwin_root = library.get_configuration<string>("cygwin_root")
 
+
+	context.subscriptions.push(IsabelleEditorProvider.register(context));
 
   /* server */
 
