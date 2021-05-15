@@ -2,6 +2,8 @@
 
 import * as library from './library'
 import { Disposable, DocumentSelector, ExtensionContext, extensions, window } from 'vscode'
+import { IsabelleFSP } from './isabelleFSP';
+import { SymbolEncoder } from './symbol_encoder';
 
 
 /* ASCII characters */
@@ -115,6 +117,8 @@ interface PrettifySymbolsMode
 
 export function setup(context: ExtensionContext, entries: [Entry])
 {
+  IsabelleFSP.register(context, new SymbolEncoder(entries));
+  return;
   update_entries(entries)
 
   const prettify_symbols_mode =

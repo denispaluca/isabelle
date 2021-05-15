@@ -1,6 +1,8 @@
 import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChangeType, 
-    FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, commands, window, TextDocument } from "vscode";
+    FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, 
+    commands, window, TextDocument } from "vscode";
 import * as path from 'path';
+import { SymbolEncoder } from "./symbol_encoder";
 
 export class File implements FileStat {
 
@@ -48,15 +50,10 @@ export class IsabelleFSP implements FileSystemProvider {
     root = new Directory('');
     public static readonly schema = 'isabelle';
     private pathMap = new Map<string, string>();
+    private symbolEncoder: SymbolEncoder;
 
-    public static register(context: ExtensionContext) {
-        const isabelleFSP = new IsabelleFSP();
-        workspace.updateWorkspaceFolders(0, 0, 
-            { 
-                uri: Uri.parse(`${this.schema}:/`), 
-                name: "Isabelle - Files" 
-            }
-        );
+    public static register(context: ExtensionContext, symbolEncoder: SymbolEncoder) {
+        const isabelleFSP = new IsabelleFSP(symbolEncoder);
 
         context.subscriptions.push(
             workspace.registerFileSystemProvider(
@@ -74,6 +71,13 @@ export class IsabelleFSP implements FileSystemProvider {
                 await window.showTextDocument(newUri);
             })
         );
+        
+        workspace.updateWorkspaceFolders(0, 0, 
+            { 
+                uri: Uri.parse(`${this.schema}:/`), 
+                name: "Isabelle - Files" 
+            }
+        );
 
     }
 
@@ -85,6 +89,10 @@ export class IsabelleFSP implements FileSystemProvider {
         this.pathMap.set(newUri.path, doc.uri.path);
 
         return newUri;
+    }
+
+    constructor(symbolEncoder: SymbolEncoder){
+        this.symbolEncoder = symbolEncoder;
     }
 
     stat(uri: Uri): FileStat {
@@ -105,7 +113,7 @@ export class IsabelleFSP implements FileSystemProvider {
     readFile(uri: Uri): Uint8Array {
         const data = this._lookupAsFile(uri, false).data;
         if (data) {
-            return data;
+            return this.symbolEncoder.encode(data);
         }
         throw FileSystemError.FileNotFound();
     }
