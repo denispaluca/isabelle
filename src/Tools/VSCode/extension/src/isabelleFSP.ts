@@ -71,7 +71,7 @@ export class IsabelleFSP implements FileSystemProvider {
                 await window.showTextDocument(newUri);
             })
         );
-        
+
         workspace.updateWorkspaceFolders(0, 0, 
             { 
                 uri: Uri.parse(`${this.schema}:/`), 
@@ -113,7 +113,7 @@ export class IsabelleFSP implements FileSystemProvider {
     readFile(uri: Uri): Uint8Array {
         const data = this._lookupAsFile(uri, false).data;
         if (data) {
-            return this.symbolEncoder.encode(data);
+            return data;
         }
         throw FileSystemError.FileNotFound();
     }
@@ -131,13 +131,16 @@ export class IsabelleFSP implements FileSystemProvider {
         if (entry && options.create && !options.overwrite) {
             throw FileSystemError.FileExists(uri);
         }
+
+        const newContent = this.symbolEncoder.encode(content);
+
         if(entry){
             entry.mtime = Date.now();
-            entry.size = content.byteLength;
-            entry.data = content;
+            entry.size = newContent.byteLength;
+            entry.data = newContent;
             
             const originUri = Uri.parse(this.pathMap.get(uri.path));
-            await workspace.fs.writeFile(originUri, content);
+            await workspace.fs.writeFile(originUri, this.symbolEncoder.decode(content));
     
             this._fireSoon({ type: FileChangeType.Changed, uri });
             return;
@@ -146,8 +149,8 @@ export class IsabelleFSP implements FileSystemProvider {
         entry = new File(basename);
         parent.entries.set(basename, entry);
         entry.mtime = Date.now();
-        entry.size = content.byteLength;
-        entry.data = content;
+        entry.size = newContent.byteLength;
+        entry.data = newContent;
         this._fireSoon({ type: FileChangeType.Created, uri });
     }
 
