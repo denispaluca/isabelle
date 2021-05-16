@@ -60,16 +60,15 @@ export class SymbolEncoder {
     }
 
     private code2(content: Uint8Array, origin: EncodeData, replacements: EncodeData): Uint8Array {
-        let result: number[] = this.getNumbers(content);
         for(const [key, val] of origin.indexMap.entries()){
             let newContent: number[] = [];
             const replacement = this.getNumbers(replacements.indexMap.get(key));
             let i: number;
-            for(i = 0; i < result.length - val.length; i++){
+            for(i = 0; i < content.length - val.length; i++){
                 let isCorrect = true;
                 let j: number;
                 for(j = 0; j < val.length; j++){
-                    if(val[j] !== result[i+j]){
+                    if(val[j] !== content[i+j]){
                         isCorrect = false;
                         break;
                     }
@@ -80,16 +79,16 @@ export class SymbolEncoder {
                     i += j - 1;
                     continue;
                 }
-                newContent.push(result[i]);
+                newContent.push(content[i]);
             }
 
-            for(;i < result.length; i++)
-                newContent.push(result[i]);
+            for(;i < content.length; i++)
+                newContent.push(content[i]);
             
-            result = newContent;
+            content = new Uint8Array(newContent);
         }
 
-        return new Uint8Array(result);
+        return content;
     }
 
     private getNumbers(content: Uint8Array): number[]{
