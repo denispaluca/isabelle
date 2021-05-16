@@ -1,9 +1,15 @@
 import { TextEncoder } from 'util';
-import {Entry} from './symbol';
 
 interface SlicePos {
     length: number;
     replacementIndex: number;
+}
+
+export interface SymbolEntry
+{
+  symbol: string,
+  name: string,
+  code: number
 }
 
 class EncodeData {
@@ -33,7 +39,7 @@ export class SymbolEncoder {
     private symbols: EncodeData;
     private sequences: EncodeData;
 
-    constructor(entries: Entry[]){
+    constructor(entries: SymbolEntry[]){
         let syms: Uint8Array[] = [];
         let seqs: Uint8Array[] = [];
         const encoder = new TextEncoder();

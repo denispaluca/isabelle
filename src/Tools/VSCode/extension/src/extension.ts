@@ -6,7 +6,6 @@ import * as decorations from './decorations';
 import * as preview_panel from './preview_panel';
 import * as protocol from './protocol';
 import * as state_panel from './state_panel';
-import * as symbol from './symbol';
 import * as completion from './completion';
 import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, workspace, window,
   commands, languages } from 'vscode';
@@ -29,6 +28,7 @@ export function activate(context: ExtensionContext)
   if (isabelle_home === "")
     window.showErrorMessage("Missing user settings: isabelle.home")
   else {
+    IsabelleFSP.register(context);
     const isabelle_tool = isabelle_home + "/bin/isabelle"
     const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions"]
 
@@ -151,7 +151,7 @@ export function activate(context: ExtensionContext)
     language_client.onReady().then(() =>
     {
       language_client.onNotification(protocol.symbols_type,
-        params => symbol.setup(context, params.entries))
+        params => IsabelleFSP.updateSymbolEncoder(params.entries))
       language_client.sendNotification(protocol.symbols_request_type)
     })
 

@@ -2,7 +2,7 @@ import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChang
     FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, 
     commands, window, TextDocument } from "vscode";
 import * as path from 'path';
-import { SymbolEncoder } from "./symbol_encoder";
+import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
 
 export class File implements FileStat {
 
@@ -50,10 +50,10 @@ export class IsabelleFSP implements FileSystemProvider {
     root = new Directory('');
     public static readonly scheme = 'isabelle';
     private pathMap = new Map<string, string>();
-    private symbolEncoder: SymbolEncoder;
+    private static symbolEncoder: SymbolEncoder;
 
-    public static register(context: ExtensionContext, symbolEncoder: SymbolEncoder) {
-        const isabelleFSP = new IsabelleFSP(symbolEncoder);
+    public static register(context: ExtensionContext) {
+        const isabelleFSP = new IsabelleFSP();
 
         context.subscriptions.push(
             workspace.registerFileSystemProvider(
@@ -62,8 +62,8 @@ export class IsabelleFSP implements FileSystemProvider {
             ),
             workspace.onDidOpenTextDocument(async document => {
                 if(document.uri.scheme !== 'file') return;
-
                 if(document.languageId !== 'isabelle') return;
+                if(!this.symbolEncoder) return;
 
                 commands.executeCommand('workbench.action.closeActiveEditor');
 
@@ -71,7 +71,9 @@ export class IsabelleFSP implements FileSystemProvider {
                 await window.showTextDocument(newUri);
             })
         );
+    }
 
+    public static updateSymbolEncoder(entries: SymbolEntry[]) {
         workspace.updateWorkspaceFolders(0, 0, 
             { 
                 uri: Uri.parse(`${this.scheme}:/`), 
@@ -79,6 +81,7 @@ export class IsabelleFSP implements FileSystemProvider {
             }
         );
 
+        this.symbolEncoder = new SymbolEncoder(entries);
     }
 
     public async createFromOriginal(doc: TextDocument): Promise<Uri>{
@@ -89,10 +92,6 @@ export class IsabelleFSP implements FileSystemProvider {
         this.pathMap.set(newUri.path, doc.uri.path);
 
         return newUri;
-    }
-
-    constructor(symbolEncoder: SymbolEncoder){
-        this.symbolEncoder = symbolEncoder;
     }
 
     stat(uri: Uri): FileStat {
@@ -119,6 +118,8 @@ export class IsabelleFSP implements FileSystemProvider {
     }
 
     async writeFile(uri: Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
+        if(!IsabelleFSP.symbolEncoder) return;
+
         const basename = path.posix.basename(uri.path);
         const parent = this._lookupParentDirectory(uri);
         let entry = parent.entries.get(basename);
@@ -132,7 +133,7 @@ export class IsabelleFSP implements FileSystemProvider {
             throw FileSystemError.FileExists(uri);
         }
 
-        const newContent = this.symbolEncoder.encode(content);
+        const newContent = IsabelleFSP.symbolEncoder.encode(content);
 
         if(entry){
             entry.mtime = Date.now();
@@ -140,7 +141,7 @@ export class IsabelleFSP implements FileSystemProvider {
             entry.data = newContent;
             
             const originUri = Uri.parse(this.pathMap.get(uri.path));
-            await workspace.fs.writeFile(originUri, this.symbolEncoder.decode(content));
+            await workspace.fs.writeFile(originUri, IsabelleFSP.symbolEncoder.decode(content));
     
             this._fireSoon({ type: FileChangeType.Changed, uri });
             return;

@@ -2,8 +2,7 @@
 
 import { MarkdownString } from 'vscode'
 import { NotificationType } from 'vscode-languageclient';
-import * as symbol from './symbol'
-
+import { SymbolEntry } from './symbol_encoder';
 
 /* decorations */
 
@@ -106,7 +105,7 @@ export const preview_response_type =
 
 export interface Symbols
 {
-  entries: [symbol.Entry]
+  entries: [SymbolEntry]
 }
 
 export const symbols_type =
