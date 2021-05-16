@@ -71,16 +71,15 @@ export class IsabelleFSP implements FileSystemProvider {
                 await window.showTextDocument(newUri);
             })
         );
-    }
-
-    public static updateSymbolEncoder(entries: SymbolEntry[]) {
         workspace.updateWorkspaceFolders(0, 0, 
             { 
                 uri: Uri.parse(`${this.scheme}:/`), 
                 name: "Isabelle - Files" 
             }
         );
+    }
 
+    public static updateSymbolEncoder(entries: SymbolEntry[]) {
         this.symbolEncoder = new SymbolEncoder(entries);
     }
 

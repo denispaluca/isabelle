@@ -52,11 +52,48 @@ export class SymbolEncoder {
     }
 
     encode(content: Uint8Array): Uint8Array{
-        return this.code(content, this.sequences, this.symbols);
+        return this.code2(content, this.sequences, this.symbols);
     }
 
     decode(content: Uint8Array): Uint8Array{
-        return this.code(content, this.symbols, this.sequences);
+        return this.code2(content, this.symbols, this.sequences);
+    }
+
+    private code2(content: Uint8Array, origin: EncodeData, replacements: EncodeData): Uint8Array {
+        let result: number[] = this.getNumbers(content);
+        for(const [key, val] of origin.indexMap.entries()){
+            let newContent: number[] = [];
+            const replacement = this.getNumbers(replacements.indexMap.get(key));
+            for(let i = 0; i < result.length - origin.minLength; i++){
+                let isCorrect = true;
+                let j: number;
+                for(j = 0; j < val.length; j++){
+                    if(val[j] !== result[i+j]){
+                        isCorrect = false;
+                        break;
+                    }
+                }
+
+                if(isCorrect){
+                    newContent.push(...replacement);
+                    i += j - 1;
+                    continue;
+                }
+                newContent.push(result[i]);
+            }
+            result = newContent;
+        }
+
+        return new Uint8Array(result);
+    }
+
+    private getNumbers(content: Uint8Array): number[]{
+        let result: number[] = [];
+        for(const i of content){
+            result.push(i);
+        }
+
+        return result;
     }
 
     private code(content: Uint8Array, origin: EncodeData, replacements: EncodeData): Uint8Array {
