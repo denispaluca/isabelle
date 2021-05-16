@@ -48,7 +48,7 @@ export type Entry = File | Directory;
 export class IsabelleFSP implements FileSystemProvider {
 
     root = new Directory('');
-    public static readonly schema = 'isabelle';
+    public static readonly scheme = 'isabelle';
     private pathMap = new Map<string, string>();
     private symbolEncoder: SymbolEncoder;
 
@@ -57,7 +57,7 @@ export class IsabelleFSP implements FileSystemProvider {
 
         context.subscriptions.push(
             workspace.registerFileSystemProvider(
-                this.schema, 
+                this.scheme, 
                 isabelleFSP
             ),
             workspace.onDidOpenTextDocument(async document => {
@@ -74,7 +74,7 @@ export class IsabelleFSP implements FileSystemProvider {
 
         workspace.updateWorkspaceFolders(0, 0, 
             { 
-                uri: Uri.parse(`${this.schema}:/`), 
+                uri: Uri.parse(`${this.scheme}:/`), 
                 name: "Isabelle - Files" 
             }
         );
@@ -84,7 +84,7 @@ export class IsabelleFSP implements FileSystemProvider {
     public async createFromOriginal(doc: TextDocument): Promise<Uri>{
         const data = await workspace.fs.readFile(doc.uri);
 
-        const newUri = Uri.parse(`${IsabelleFSP.schema}:/${path.basename(doc.fileName)}`);
+        const newUri = Uri.parse(`${IsabelleFSP.scheme}:/${path.basename(doc.fileName)}`);
         this.writeFile(newUri, data, {create: true, overwrite: true});
         this.pathMap.set(newUri.path, doc.uri.path);
 

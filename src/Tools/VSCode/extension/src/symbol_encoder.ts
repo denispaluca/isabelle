@@ -1,5 +1,4 @@
 import { TextEncoder } from 'util';
-import { escape_regex } from './library';
 import {Entry} from './symbol';
 
 interface SlicePos {
@@ -38,9 +37,9 @@ export class SymbolEncoder {
         let syms: Uint8Array[] = [];
         let seqs: Uint8Array[] = [];
         const encoder = new TextEncoder();
-        for(const entry of entries) {
-            seqs.push(encoder.encode(entry.symbol));
-            syms.push(encoder.encode(String.fromCharCode(entry.code)))
+        for(const {symbol, code} of entries) {
+            seqs.push(encoder.encode(symbol));
+            syms.push(encoder.encode(String.fromCharCode(code)))
         }
         this.symbols = new EncodeData(syms);
         this.sequences = new EncodeData(seqs);

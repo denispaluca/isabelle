@@ -23,6 +23,7 @@
         "Programming Languages"
     ],
     "activationEvents": [
+		"onFileSystem:isabelle",
         "onLanguage:isabelle",
         "onLanguage:isabelle-ml",
         "onLanguage:bibtex",
@@ -32,6 +33,11 @@
     "main": "./out/src/extension",
     "contributes": {
         "commands": [
+			{
+				"command": "memfs.init",
+				"title": "Create Files",
+				"category": "MemFS"
+			},
             {
                 "command": "isabelle.state",
                 "title": "Show State",

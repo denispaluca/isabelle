@@ -12,6 +12,7 @@ import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, wor
   commands, languages } from 'vscode';
 import { LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, TransportKind,
   NotificationType } from 'vscode-languageclient';
+import { IsabelleFSP } from './isabelleFSP';
 
 
 let last_caret_update: protocol.Caret_Update = {}
@@ -43,6 +44,7 @@ export function activate(context: ExtensionContext)
     const language_client_options: LanguageClientOptions = {
       documentSelector: [
         { language: "isabelle", scheme: "file" },
+        { language: "isabelle", scheme: IsabelleFSP.scheme },
         { language: "isabelle-ml", scheme: "file" },
         { language: "bibtex", scheme: "file" }
       ]
