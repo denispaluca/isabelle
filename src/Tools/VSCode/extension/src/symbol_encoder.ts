@@ -64,7 +64,8 @@ export class SymbolEncoder {
         for(const [key, val] of origin.indexMap.entries()){
             let newContent: number[] = [];
             const replacement = this.getNumbers(replacements.indexMap.get(key));
-            for(let i = 0; i < result.length - origin.minLength; i++){
+            let i: number;
+            for(i = 0; i < result.length - val.length; i++){
                 let isCorrect = true;
                 let j: number;
                 for(j = 0; j < val.length; j++){
@@ -81,6 +82,10 @@ export class SymbolEncoder {
                 }
                 newContent.push(result[i]);
             }
+
+            for(;i < result.length; i++)
+                newContent.push(result[i]);
+            
             result = newContent;
         }
 
