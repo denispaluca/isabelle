@@ -234,16 +234,20 @@ class VSCode_Rendering(snapshot: Document.Snapshot, val model: VSCode_Model)
             dotted(model.content.text_range)))).flatten :::
     List(VSCode_Spell_Checker.decoration(rendering))
 
-  def decoration_output(decoration: VSCode_Model.Decoration): LSP.Decoration =
+  def decoration_output(decoration: List[VSCode_Model.Decoration]): LSP.Decoration =
   {
-    val content =
-      for (Text.Info(text_range, msgs) <- decoration.content)
-      yield {
-        val range = model.content.doc.range(text_range)
-        LSP.DecorationOpts(range,
-          msgs.map(msg => LSP.MarkedString(resources.output_pretty_tooltip(msg))))
-      }
-    LSP.Decoration(decoration.typ, content)
+    val entries = for(deco <- decoration)
+        yield {
+          val decopts = (for(Text.Info(text_range, msgs) <- deco.content)
+            yield {
+              val range = model.content.doc.range(text_range)
+              LSP.DecorationOpts(range,
+                msgs.map(msg => LSP.MarkedString(resources.output_pretty_tooltip(msg))))
+            })
+          (deco.typ, decopts)
+        }
+
+    LSP.Decoration(entries)
   }
 
 

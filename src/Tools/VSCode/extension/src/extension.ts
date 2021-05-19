@@ -9,8 +9,7 @@ import * as state_panel from './state_panel';
 import * as completion from './completion';
 import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, workspace, window,
   commands, languages } from 'vscode';
-import { LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, TransportKind,
-  NotificationType } from 'vscode-languageclient';
+import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient';
 import { IsabelleFSP } from './isabelleFSP';
 
 
@@ -47,7 +46,11 @@ export function activate(context: ExtensionContext)
         { language: "isabelle", scheme: IsabelleFSP.scheme },
         { language: "isabelle-ml", scheme: "file" },
         { language: "bibtex", scheme: "file" }
-      ]
+      ],
+      uriConverters: {
+        code2Protocol: (uri) => IsabelleFSP.pathMap.get(uri.toString()) || uri.toString(),
+        protocol2Code: uriMap
+      }
     };
 
     const language_client =
@@ -188,5 +191,10 @@ export function activate(context: ExtensionContext)
     context.subscriptions.push(language_client.start())
   }
 }
+
+export const uriMap = (uri: string) => [...IsabelleFSP.pathMap.entries()]
+    .filter(([key, val]) => val === uri)
+    .map(([key, val]) => Uri.parse(key))
+    .pop() || Uri.parse(uri);
 
 export function deactivate() { }

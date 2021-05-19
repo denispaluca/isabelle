@@ -13,13 +13,17 @@ export interface DecorationOpts {
 
 export interface Decoration
 {
-  uri: string,
-  "type": string,
-  content: DecorationOpts[]
+  "type": string;
+  content: DecorationOpts[];
+}
+
+export interface DocumentDecorations {
+  uri: string;
+  entries: Decoration[]
 }
 
 export const decoration_type =
-  new NotificationType<Decoration, void>("PIDE/decoration")
+  new NotificationType<DocumentDecorations, void>("PIDE/decoration")
 
 
 /* caret handling */

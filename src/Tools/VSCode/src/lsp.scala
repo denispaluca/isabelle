@@ -501,11 +501,17 @@ object LSP
       JSON.optional("hover_message" -> MarkedStrings.json(hover_message))
   }
 
-  sealed case class Decoration(typ: String, content: List[DecorationOpts])
+  sealed case class Decoration(decos: List[(String, List[DecorationOpts])])
   {
     def json(file: JFile): JSON.T =
       Notification("PIDE/decoration",
-        JSON.Object("uri" -> Url.print_file(file), "type" -> typ, "content" -> content.map(_.json)))
+        JSON.Object(
+          "uri" -> Url.print_file(file),
+          "entries" -> decos.map(c => JSON.Object(
+            "type" -> c._1,
+            "content" -> c._2.map(_.json))
+          ))
+      )
   }
 
 

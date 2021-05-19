@@ -50,7 +50,7 @@ export class IsabelleFSP implements FileSystemProvider {
 
     root = new Directory('');
     public static readonly scheme = 'isabelle';
-    private pathMap = new Map<string, string>();
+    public static pathMap = new Map<string, string>();
     private static symbolEncoder: SymbolEncoder;
 
     public static register(context: ExtensionContext) {
@@ -66,10 +66,10 @@ export class IsabelleFSP implements FileSystemProvider {
                 if(document.languageId !== 'isabelle') return;
                 if(!this.symbolEncoder) return;
 
-                commands.executeCommand('workbench.action.closeActiveEditor');
+                //commands.executeCommand('workbench.action.closeActiveEditor');
 
                 const newUri = await isabelleFSP.createFromOriginal(document);
-                await window.showTextDocument(newUri);
+                // window.showTextDocument(newUri);
             })
         );
         workspace.updateWorkspaceFolders(0, 0, 
@@ -89,7 +89,7 @@ export class IsabelleFSP implements FileSystemProvider {
 
         const newUri = Uri.parse(`${IsabelleFSP.scheme}:/${path.basename(doc.fileName)}`);
         this.writeFile(newUri, data, {create: true, overwrite: true});
-        this.pathMap.set(newUri.path, doc.uri.path);
+        IsabelleFSP.pathMap.set(newUri.toString(), doc.uri.toString());
 
         return newUri;
     }
@@ -140,8 +140,8 @@ export class IsabelleFSP implements FileSystemProvider {
             entry.size = newContent.byteLength;
             entry.data = newContent;
             
-            const originUri = Uri.parse(this.pathMap.get(uri.path));
-            workspace.fs.writeFile(originUri, newContent);
+            // const originUri = Uri.parse(IsabelleFSP.pathMap.get(uri.path));
+            // workspace.fs.writeFile(originUri, newContent);
     
             this._fireSoon({ type: FileChangeType.Changed, uri });
             return;
