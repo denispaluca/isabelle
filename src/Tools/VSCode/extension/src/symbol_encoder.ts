@@ -9,7 +9,8 @@ export interface SymbolEntry
 {
   symbol: string,
   name: string,
-  code: number
+  code: number,
+  abbrevs: string[]
 }
 
 class EncodeData {

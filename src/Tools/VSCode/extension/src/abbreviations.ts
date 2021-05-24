@@ -18,7 +18,7 @@ function registerAbbreviations(data: SymbolEntry[], context: ExtensionContext){
 
             let c: TextDocumentContentChangeEvent;
             while(c = changes.pop()){
-                if(c.rangeLength === 1 || hasSpaceOrReturn(c.text)){
+                if(c.rangeLength === 1 || hasNewline(c.text)){
                     return;
                 }
                 
@@ -27,20 +27,24 @@ function registerAbbreviations(data: SymbolEntry[], context: ExtensionContext){
 
                 const endPos = doc.positionAt(endOffset);
 
+                let longestMatch: string;
+                let range: Range;
                 for(const key in entries){
                     const beginOffset = endOffset - key.length;
-                    if(beginOffset < 0) {
+                    if(beginOffset < 0 || 
+                        (longestMatch && longestMatch.length >= key.length)) {
                         continue;
                     }
 
                     const beginPos = doc.positionAt(beginOffset);
-                    const range = new Range(beginPos, endPos);
-                    const compText = doc.getText(range);
+                    const tempRange = new Range(beginPos, endPos);
+                    const compText = doc.getText(tempRange);
                     if(compText === key){
-                        edits.replace(doc.uri, range, entries[key]);
-                        break;
+                        longestMatch = compText;
+                        range = tempRange;
                     }
                 }    
+                edits.replace(doc.uri, range, entries[longestMatch]);
             }
 
             applyEdits(edits);
@@ -55,15 +59,35 @@ async function applyEdits(edit: WorkspaceEdit){
 }
 
 function setAbbrevs(data: SymbolEntry[]){
-    for(const {symbol, code} of data){
+    const customAbbrevs = new Set<string>();
+    for(const {symbol, code, abbrevs} of data){
         entries[symbol] = String.fromCharCode(code);
+        for(const abbrev of abbrevs){
+            entries[abbrev] = String.fromCharCode(code);
+            customAbbrevs.add(abbrev);
+        }
+    }
+
+    //Add white space to abbrevs which are shorter versions 
+    //of longer abbrevs
+    for(const a1 of customAbbrevs.values()){
+        for(const a2 of customAbbrevs.values()){
+            if(a1 == a2){
+                continue;
+            }
+
+            if(a2.includes(a1)){
+                const val = entries[a1];
+                delete entries[a1];
+                entries[a1 + ' '] = val;
+                break;
+            }
+        }
     }
 }
 
-function hasSpaceOrReturn(text: string){
-    return text.includes(' ') || 
-        text.includes('\n') || 
-        text.includes('\r');
+function hasNewline(text: string){
+    return text.includes('\n') || text.includes('\r');
 }
 
 function waitForNextTick(): Promise<void> {
