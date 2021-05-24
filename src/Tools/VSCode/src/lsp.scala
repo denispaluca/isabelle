@@ -625,7 +625,12 @@ object LSP
     {
       val entries =
         for ((sym, code) <- Symbol.codes)
-        yield JSON.Object("symbol" -> sym, "name" -> Symbol.names(sym)._1, "code" -> code)
+        yield JSON.Object(
+          "symbol" -> sym,
+          "name" -> Symbol.names(sym)._1,
+          "code" -> code,
+          "abbrevs" -> Symbol.abbrevs.get_list(sym)
+        )
       Notification("PIDE/symbols", JSON.Object("entries" -> entries))
     }
   }
