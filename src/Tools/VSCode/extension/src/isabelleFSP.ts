@@ -1,9 +1,8 @@
 import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChangeType, 
     FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, 
-    commands, window, TextDocument } from "vscode";
+    TextDocument } from "vscode";
 import * as path from 'path';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
-import * as fs from 'fs';
 
 export class File implements FileStat {
 
@@ -112,7 +111,7 @@ export class IsabelleFSP implements FileSystemProvider {
     readFile(uri: Uri): Uint8Array {
         const data = this._lookupAsFile(uri, false).data;
         if (data) {
-            return IsabelleFSP.symbolEncoder.encode(data);
+            return data;
         }
         throw FileSystemError.FileNotFound();
     }
@@ -133,12 +132,12 @@ export class IsabelleFSP implements FileSystemProvider {
             throw FileSystemError.FileExists(uri);
         }
         
-        const newContent = IsabelleFSP.symbolEncoder.decode(content);
+
 
         if(entry){
             entry.mtime = Date.now();
-            entry.size = newContent.byteLength;
-            entry.data = newContent;
+            entry.size = content.byteLength;
+            entry.data = content;
             
             // const originUri = Uri.parse(IsabelleFSP.pathMap.get(uri.path));
             // workspace.fs.writeFile(originUri, newContent);
@@ -147,6 +146,7 @@ export class IsabelleFSP implements FileSystemProvider {
             return;
         }
 
+        const newContent = IsabelleFSP.symbolEncoder.encode(content);
         entry = new File(basename);
         parent.entries.set(basename, entry);
         entry.mtime = Date.now();

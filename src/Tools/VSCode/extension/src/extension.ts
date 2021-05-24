@@ -11,6 +11,7 @@ import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, wor
   commands, languages } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient';
 import { IsabelleFSP } from './isabelleFSP';
+import { registerAbbreviations } from './abbreviations';
 
 
 let last_caret_update: protocol.Caret_Update = {}
@@ -154,7 +155,10 @@ export function activate(context: ExtensionContext)
     language_client.onReady().then(() =>
     {
       language_client.onNotification(protocol.symbols_type,
-        params => IsabelleFSP.updateSymbolEncoder(params.entries))
+        params => {
+          registerAbbreviations(params.entries, context);
+          IsabelleFSP.updateSymbolEncoder(params.entries)
+        })
       language_client.sendNotification(protocol.symbols_request_type)
     })
 
