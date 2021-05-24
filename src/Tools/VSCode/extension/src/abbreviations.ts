@@ -18,7 +18,7 @@ function registerAbbreviations(data: SymbolEntry[], context: ExtensionContext){
 
             let c: TextDocumentContentChangeEvent;
             while(c = changes.pop()){
-                if(hasSpaceOrReturn(c.text)){
+                if(c.rangeLength === 1 || hasSpaceOrReturn(c.text)){
                     return;
                 }
                 
