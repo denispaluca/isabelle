@@ -2,6 +2,7 @@ class TreeNode {
     public key: number;
     public parent: TreeNode = null;
     public end: boolean = false;
+    public value: number[];
     public children: Record<number, TreeNode> = {};
     constructor(key: number){
         this.key = key;
@@ -27,7 +28,7 @@ class PrefixTree {
         this.root = new TreeNode(null);
     }
 
-    public insert(word: number[]){
+    public insert(word: number[], value: number[]){
         let node = this.root;
         for(var i = 0; i < word.length; i++) {
             if (!node.children[word[i]]) {
@@ -40,6 +41,7 @@ class PrefixTree {
             
             if (i == word.length-1) {
                 node.end = true;
+                node.value = value;
             }
         }
     }
@@ -94,4 +96,4 @@ class PrefixTree {
     }
 }
 
-export { PrefixTree };
+export { PrefixTree, TreeNode };
