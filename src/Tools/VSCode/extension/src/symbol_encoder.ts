@@ -1,4 +1,6 @@
 import { TextEncoder } from 'util';
+import { window } from 'vscode';
+import { PrefixTree } from './prefix_tree';
 
 interface SlicePos {
     length: number;
@@ -14,12 +16,13 @@ export interface SymbolEntry
 
 class EncodeData {
     indexMap: Map<number, Uint8Array>;
+    prefixTree: PrefixTree;
     minLength: number;
     maxLength: number;
 
     constructor(data: Uint8Array[]){
         this.indexMap = new Map();
-
+        this.prefixTree = new PrefixTree();
 
         let i: number = 0;
         for(const entry of data){
@@ -30,8 +33,26 @@ class EncodeData {
                 this.maxLength = entry.length;
 
             this.indexMap.set(i, entry);
+            this.prefixTree.insert(Array.from(entry))
             i++;
         }
+    }
+
+    public getKey(word: number[]): number | undefined{
+        const w = new Uint8Array(word);
+        return [...this.indexMap.entries()]
+            .filter(({ 1: v }) => EncodeData.areEqual(v, w))
+            .map(([k]) => k)
+            .pop();
+    }
+
+    private static areEqual(w1: Uint8Array, w2: Uint8Array): boolean{
+        if(w1.length !== w2.length) return false;
+
+        for(let i = 0; i < w1.length; i++){
+            if(w1[i] !== w2[i]) return false;
+        }
+        return true;
     }
 }
 
@@ -52,17 +73,50 @@ export class SymbolEncoder {
     }
 
     encode(content: Uint8Array): Uint8Array{
-        return this.code2(content, this.sequences, this.symbols);
+        return this.code3(content, this.sequences, this.symbols);
     }
 
     decode(content: Uint8Array): Uint8Array{
-        return this.code2(content, this.symbols, this.sequences);
+        return this.code3(content, this.symbols, this.sequences);
+    }
+
+    private code3(content: Uint8Array, origin: EncodeData, replacements: EncodeData): Uint8Array {
+        const result: number[] = [];
+        for(let i = 0; i < content.length; i++){
+            if(i > content.length - origin.minLength){
+                result.push(content[i]);
+                continue;
+            }
+
+            let word = [content[i]];
+            let matches: number[][];
+            let found = false;
+            for(let j = i + 1; j < i + origin.maxLength; j++){
+                matches = origin.prefixTree.find(word);
+                if(matches.length == 0) break;
+                if(matches.length == 1 && word.length == matches[0].length){
+                    found = true;
+                    break;
+                }
+
+                word.push(content[j]);
+            }
+            
+            if(found){
+                result.push(...Array.from(replacements.indexMap.get(origin.getKey(word))));
+                i += word.length - 1;
+                continue;
+            }
+            result.push(content[i]);
+        }
+
+        return new Uint8Array(result);
     }
 
     private code2(content: Uint8Array, origin: EncodeData, replacements: EncodeData): Uint8Array {
         for(const [key, val] of origin.indexMap.entries()){
             let newContent: number[] = [];
-            const replacement = this.getNumbers(replacements.indexMap.get(key));
+            const replacement = Array.from(replacements.indexMap.get(key));
             let i: number;
             for(i = 0; i < content.length - val.length; i++){
                 let isCorrect = true;
@@ -89,15 +143,6 @@ export class SymbolEncoder {
         }
 
         return content;
-    }
-
-    private getNumbers(content: Uint8Array): number[]{
-        let result: number[] = [];
-        for(const i of content){
-            result.push(i);
-        }
-
-        return result;
     }
 
     private code(content: Uint8Array, origin: EncodeData, replacements: EncodeData): Uint8Array {
