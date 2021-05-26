@@ -1,5 +1,4 @@
 import { TextEncoder } from 'util';
-import { window } from 'vscode';
 import { PrefixTree } from './prefix_tree';
 
 interface SlicePos {
@@ -82,24 +81,25 @@ export class SymbolEncoder {
 
     private code3(content: Uint8Array, origin: EncodeData, replacements: EncodeData): Uint8Array {
         const result: number[] = [];
+
         for(let i = 0; i < content.length; i++){
             if(i > content.length - origin.minLength){
                 result.push(content[i]);
                 continue;
             }
 
-            let word = [content[i]];
-            let matches: number[][];
+            let word: number[] = [];
             let found = false;
-            for(let j = i + 1; j < i + origin.maxLength; j++){
-                matches = origin.prefixTree.find(word);
-                if(matches.length == 0) break;
-                if(matches.length == 1 && word.length == matches[0].length){
+            for(let j = i; j < i + origin.maxLength; j++){
+                word.push(content[j]);
+                const node = origin.prefixTree.getNode(word);
+                if(!node){
+                    break;
+                }
+                if(node.end){
                     found = true;
                     break;
                 }
-
-                word.push(content[j]);
             }
             
             if(found){

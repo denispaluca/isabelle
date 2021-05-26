@@ -44,16 +44,38 @@ class PrefixTree {
         }
     }
 
+    public check(prefix: number[]): boolean {
+        return !!this.getNode(prefix);
+    }
+
+    public contains(word: number[]): boolean {
+        let node = this.getNode(word);
+        if(!node){
+            return false;
+        }
+
+        return node.end;
+    }
+
+    public getNode(prefix: number[]): TreeNode | undefined {
+        let node = this.root;
+        
+        for(let i = 0; i < prefix.length; i++) {
+          if (!node.children[prefix[i]]) {
+            return;
+          }
+          node = node.children[prefix[i]];
+        }
+        return node;
+    }
+
     public find(prefix: number[]): number[][] {
         let node = this.root;
         let output: number[][] = [];
         
-        for(var i = 0; i < prefix.length; i++) {
-          if (node.children[prefix[i]]) {
-            node = node.children[prefix[i]];
-          } else {
+        node = this.getNode(prefix);
+        if(!node){
             return output;
-          }
         }
         
         this.findAllWords(node, output);
