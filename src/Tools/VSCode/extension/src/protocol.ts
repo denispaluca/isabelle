@@ -2,7 +2,7 @@
 
 import { MarkdownString } from 'vscode'
 import { NotificationType } from 'vscode-languageclient';
-import { SymbolEntry } from './symbol_encoder';
+import { SymbolEntry } from './isabelle_filesystem/symbol_encoder';
 
 /* decorations */
 

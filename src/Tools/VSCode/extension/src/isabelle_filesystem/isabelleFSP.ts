@@ -1,9 +1,8 @@
 import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChangeType, 
     FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, 
-    commands, window, TextDocument } from "vscode";
+    TextDocument } from "vscode";
 import * as path from 'path';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
-import * as fs from 'fs';
 
 export class File implements FileStat {
 

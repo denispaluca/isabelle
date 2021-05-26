@@ -1,11 +1,6 @@
 import { TextEncoder } from 'util';
 import { PrefixTree, TreeNode } from './prefix_tree';
 
-interface SlicePos {
-    length: number;
-    replacementIndex: number;
-}
-
 export interface SymbolEntry
 {
   symbol: string,

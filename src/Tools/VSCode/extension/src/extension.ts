@@ -10,7 +10,7 @@ import * as completion from './completion';
 import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, workspace, window,
   commands, languages } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient';
-import { IsabelleFSP } from './isabelleFSP';
+import { IsabelleFSP } from './isabelle_filesystem/isabelleFSP';
 
 
 let last_caret_update: protocol.Caret_Update = {}

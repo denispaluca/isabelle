@@ -90,7 +90,7 @@ class PrefixTree {
           arr.unshift(node.getWord());
         }
         
-        for (var child in node.children) {
+        for (let child in node.children) {
           this.findAllWords(node.children[child], arr);
         }
     }
