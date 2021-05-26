@@ -2,6 +2,7 @@
 
 import * as os from 'os';
 import { TextEditor, Uri, ViewColumn, workspace, window } from 'vscode'
+import { IsabelleFSP } from './isabelle_filesystem/isabelleFSP';
 
 
 /* regular expressions */
@@ -24,7 +25,7 @@ export function platform_is_windows(): boolean
 
 export function is_file(uri: Uri): boolean
 {
-  return uri.scheme === "file"
+  return uri.scheme === "file" || uri.scheme === IsabelleFSP.scheme;
 }
 
 export function find_file_editor(uri: Uri): TextEditor | undefined

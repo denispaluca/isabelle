@@ -6,7 +6,7 @@ import { Range, DecorationOptions, DecorationRenderOptions,
   TextDocument, TextEditor, TextEditorDecorationType, ExtensionContext, Uri } from 'vscode'
 import { DocumentDecorations } from './protocol'
 import * as library from './library'
-import { uriMap } from './extension';
+import { p2c } from './extension';
 
 
 /* known decoration types */
@@ -169,7 +169,7 @@ export function close_document(document: TextDocument)
 
 export function apply_decoration(decorations: DocumentDecorations)
 {
-  const uri = uriMap(Uri.parse(decorations.uri).toString()).toString()
+  const uri = p2c(Uri.parse(decorations.uri).toString()).toString()
 
   for(const decoration of decorations.entries) {
     const typ = types.get(decoration.type)
