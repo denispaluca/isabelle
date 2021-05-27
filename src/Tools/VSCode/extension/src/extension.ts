@@ -29,7 +29,8 @@ export function activate(context: ExtensionContext)
   else {
     IsabelleFSP.register(context);
     const isabelle_tool = isabelle_home + "/bin/isabelle"
-    const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions"]
+    const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions", 
+      /* '-L', '/home/denis/Desktop/logi.log', '-v' */]
 
     const server_options: ServerOptions =
       library.platform_is_windows() ?

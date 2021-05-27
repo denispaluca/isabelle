@@ -1,6 +1,6 @@
 import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChangeType, 
     FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, 
-    TextDocument } from "vscode";
+    TextDocument, commands, window } from "vscode";
 import * as path from 'path';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
 
@@ -45,6 +45,10 @@ export class Directory implements FileStat {
 
 export type Entry = File | Directory;
 
+function waitForNextTick(): Promise<void> {
+	return new Promise((res) => setTimeout(res, 0));
+}
+
 export class IsabelleFSP implements FileSystemProvider {
 
     root = new Directory('');
@@ -79,6 +83,16 @@ export class IsabelleFSP implements FileSystemProvider {
         );
     }
 
+    private static async openNewDoc(isabelleFSP: IsabelleFSP, document: TextDocument) {
+        workspace.onDidCloseTextDocument(async doc => {
+            if(doc.uri.toString() !== document.uri.toString()) return;
+            const newUri = await isabelleFSP.createFromOriginal(document);
+            const newDoc = await workspace.openTextDocument(newUri);
+            window.showTextDocument(newDoc);
+        });
+        await commands.executeCommand('workbench.action.closeActiveEditor');
+    }
+
     public static updateSymbolEncoder(entries: SymbolEntry[]) {
         this.symbolEncoder = new SymbolEncoder(entries);
     }
@@ -87,10 +101,17 @@ export class IsabelleFSP implements FileSystemProvider {
         const data = await workspace.fs.readFile(doc.uri);
 
         const newUri = Uri.parse(`${IsabelleFSP.scheme}:/${path.basename(doc.fileName)}`);
-        this.writeFile(newUri, data, {create: true, overwrite: true});
+        const encodedData = IsabelleFSP.symbolEncoder.encode(data);
+        this.writeFile(newUri, encodedData, {create: true, overwrite: true});
         IsabelleFSP.pathMap.set(newUri.toString(), doc.uri.toString());
 
         return newUri;
+    }
+
+    private async syncOriginal(uri: Uri, content: Uint8Array){
+        const originUri = Uri.parse(IsabelleFSP.pathMap.get(uri.toString()));
+        const decodedContent = IsabelleFSP.symbolEncoder.decode(content);
+        workspace.fs.writeFile(originUri, decodedContent);
     }
 
     stat(uri: Uri): FileStat {
@@ -111,7 +132,7 @@ export class IsabelleFSP implements FileSystemProvider {
     readFile(uri: Uri): Uint8Array {
         const data = this._lookupAsFile(uri, false).data;
         if (data) {
-            return IsabelleFSP.symbolEncoder.encode(data);
+            return data;
         }
         throw FileSystemError.FileNotFound();
     }
@@ -131,17 +152,14 @@ export class IsabelleFSP implements FileSystemProvider {
         if (entry && options.create && !options.overwrite) {
             throw FileSystemError.FileExists(uri);
         }
-        
-        const newContent = IsabelleFSP.symbolEncoder.decode(content);
 
         if(entry){
+            this.syncOriginal(uri, content);
+
             entry.mtime = Date.now();
-            entry.size = newContent.byteLength;
-            entry.data = newContent;
-            
-            // const originUri = Uri.parse(IsabelleFSP.pathMap.get(uri.path));
-            // workspace.fs.writeFile(originUri, newContent);
-    
+            entry.size = content.byteLength;
+            entry.data = content;
+
             this._fireSoon({ type: FileChangeType.Changed, uri });
             return;
         }
@@ -149,8 +167,8 @@ export class IsabelleFSP implements FileSystemProvider {
         entry = new File(basename);
         parent.entries.set(basename, entry);
         entry.mtime = Date.now();
-        entry.size = newContent.byteLength;
-        entry.data = newContent;
+        entry.size = content.byteLength;
+        entry.data = content;
         this._fireSoon({ type: FileChangeType.Created, uri });
     }
 
