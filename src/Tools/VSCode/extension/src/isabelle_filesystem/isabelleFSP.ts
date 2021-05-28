@@ -3,7 +3,6 @@ import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChang
     TextDocument, commands, window, ViewColumn } from "vscode";
 import * as path from 'path';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
-import { p2c } from "../extension";
 
 export class File implements FileStat {
 
@@ -48,39 +47,27 @@ export type Entry = File | Directory;
 
 export class IsabelleFSP implements FileSystemProvider {
 
-    root = new Directory('');
+    //#region Static Members
     public static readonly scheme = 'isabelle';
-    public static pathMap = new Map<string, string>();
     private static symbolEncoder: SymbolEncoder;
+    private static instance: IsabelleFSP;
 
     public static register(context: ExtensionContext) {
-        const isabelleFSP = new IsabelleFSP();
+        this.instance = new IsabelleFSP();
 
         context.subscriptions.push(
             workspace.registerFileSystemProvider(
                 this.scheme, 
-                isabelleFSP
+                this.instance
             ),
-            workspace.onDidOpenTextDocument(async document => {
-                if(document.uri.scheme !== 'file') return;
-                if(document.languageId !== 'isabelle') return;
-                if(!this.symbolEncoder) return;
+            workspace.onDidOpenTextDocument(this.instance.decideToCreate),
+            window.onDidChangeActiveTextEditor(async ({document}) => {
+                const newUri = await this.instance.decideToCreate(document);
 
-                await isabelleFSP.createFromOriginal(document);
-            }),
-            window.onDidChangeActiveTextEditor(async te => {
-                const {document} = te;
-                if(document.uri.scheme !== 'file') return;
-                if(document.languageId !== 'isabelle') return;
-                if(!this.symbolEncoder) return;
-
-                let newUri = p2c(document.uri.toString());
-                if(newUri.scheme === 'file'){
-                    newUri = await isabelleFSP.createFromOriginal(document);
-                }
+                if(!newUri) return;
 
                 await commands.executeCommand('workbench.action.closeActiveEditor');
-                await commands.executeCommand('vscode.open', newUri, ViewColumn.Active);
+                await commands.executeCommand('vscode.open', Uri.parse(newUri), ViewColumn.Active);
             })
         );
         workspace.updateWorkspaceFolders(0, 0, 
@@ -95,19 +82,50 @@ export class IsabelleFSP implements FileSystemProvider {
         this.symbolEncoder = new SymbolEncoder(entries);
     }
 
+    public static getFileUri(isabelleUri: string): string{
+        return this.instance.isabelleToFile.get(isabelleUri) || isabelleUri;
+    }
+
+    public static getIsabelleUri(fileUri: string): string{
+        return this.instance.fileToIsabelle.get(fileUri) || fileUri;
+    }
+
+    //#endregion
+
+
+    private root = new Directory('');
+    private isabelleToFile = new Map<string, string>();
+    private fileToIsabelle = new Map<string, string>();
+
     public async createFromOriginal(doc: TextDocument): Promise<Uri>{
         const data = await workspace.fs.readFile(doc.uri);
 
         const newUri = Uri.parse(`${IsabelleFSP.scheme}:/${path.basename(doc.fileName)}`);
         const encodedData = IsabelleFSP.symbolEncoder.encode(data);
         this.writeFile(newUri, encodedData, {create: true, overwrite: true});
-        IsabelleFSP.pathMap.set(newUri.toString(), doc.uri.toString());
+        const isabelleFile = newUri.toString();
+        const discFile = doc.uri.toString();
+        this.isabelleToFile.set(isabelleFile, discFile);
+        this.fileToIsabelle.set(discFile, isabelleFile);
 
         return newUri;
     }
 
+    public async decideToCreate(doc: TextDocument): Promise<string | undefined> {
+        if(
+            doc.uri.scheme !== 'file' ||
+            doc.languageId !== 'isabelle' ||
+            !IsabelleFSP.symbolEncoder
+        ){
+            return;
+        }
+
+        return this.fileToIsabelle.get(doc.uri.toString()) || 
+            (await this.createFromOriginal(doc)).toString();
+    }
+
     private async syncOriginal(uri: Uri, content: Uint8Array){
-        const originUri = Uri.parse(IsabelleFSP.pathMap.get(uri.toString()));
+        const originUri = Uri.parse(this.isabelleToFile.get(uri.toString()));
         const decodedContent = IsabelleFSP.symbolEncoder.decode(content);
         workspace.fs.writeFile(originUri, decodedContent);
     }

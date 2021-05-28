@@ -49,8 +49,8 @@ export function activate(context: ExtensionContext)
         { language: "bibtex", scheme: "file" }
       ],
       uriConverters: {
-        code2Protocol: c2p,
-        protocol2Code: p2c
+        code2Protocol: uri => IsabelleFSP.getFileUri(uri.toString()),
+        protocol2Code: value => Uri.parse(IsabelleFSP.getIsabelleUri(value))
       }
     };
 
@@ -85,7 +85,7 @@ export function activate(context: ExtensionContext)
       }
       if (last_caret_update !== caret_update) {
         if (caret_update.uri){
-          caret_update.uri = c2p(caret_update.uri).toString();
+          caret_update.uri = IsabelleFSP.getFileUri(caret_update.uri);
           language_client.sendNotification(protocol.caret_update_type, caret_update)
         }
         last_caret_update = caret_update
@@ -101,7 +101,7 @@ export function activate(context: ExtensionContext)
       }
 
       if (caret_update.uri) {
-        caret_update.uri = p2c(caret_update.uri).toString();
+        caret_update.uri = IsabelleFSP.getIsabelleUri(caret_update.uri);
         workspace.openTextDocument(Uri.parse(caret_update.uri)).then(document =>
         {
           const editor = library.find_file_editor(document.uri)
@@ -196,10 +196,5 @@ export function activate(context: ExtensionContext)
   }
 }
 
-const c2p = (uri: Uri | string) => IsabelleFSP.pathMap.get(uri.toString()) || uri.toString();
-export const p2c = (uri: string) => [...IsabelleFSP.pathMap.entries()]
-    .filter(([key, val]) => val === uri)
-    .map(([key, val]) => Uri.parse(key))
-    .pop() || Uri.parse(uri);
 
 export function deactivate() { }

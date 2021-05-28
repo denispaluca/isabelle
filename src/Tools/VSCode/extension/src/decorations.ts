@@ -6,7 +6,7 @@ import { Range, DecorationOptions, DecorationRenderOptions,
   TextDocument, TextEditor, TextEditorDecorationType, ExtensionContext, Uri } from 'vscode'
 import { DocumentDecorations } from './protocol'
 import * as library from './library'
-import { p2c } from './extension';
+import { IsabelleFSP } from './isabelle_filesystem/isabelleFSP';
 
 
 /* known decoration types */
@@ -169,7 +169,7 @@ export function close_document(document: TextDocument)
 
 export function apply_decoration(decorations: DocumentDecorations)
 {
-  const uri = p2c(Uri.parse(decorations.uri).toString()).toString()
+  const uri = IsabelleFSP.getIsabelleUri(decorations.uri);
 
   for(const decoration of decorations.entries) {
     const typ = types.get(decoration.type)
