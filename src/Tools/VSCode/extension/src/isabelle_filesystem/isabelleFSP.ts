@@ -52,7 +52,7 @@ export class IsabelleFSP implements FileSystemProvider {
     private static symbolEncoder: SymbolEncoder;
     private static instance: IsabelleFSP;
 
-    public static register(context: ExtensionContext) {
+    public static async register(context: ExtensionContext) {
         this.instance = new IsabelleFSP();
 
         context.subscriptions.push(
@@ -70,16 +70,16 @@ export class IsabelleFSP implements FileSystemProvider {
                 await commands.executeCommand('vscode.open', Uri.parse(newUri), ViewColumn.Active);
             })
         );
-        workspace.updateWorkspaceFolders(0, 0, 
-            { 
-                uri: Uri.parse(`${this.scheme}:/`), 
-                name: "Isabelle - Files" 
-            }
-        );
+        
+        this.instance.initWorkspace();
     }
 
-    public static updateSymbolEncoder(entries: SymbolEntry[]) {
+    public static async updateSymbolEncoder(entries: SymbolEntry[]) {
         this.symbolEncoder = new SymbolEncoder(entries);
+
+        this.instance.rootPath = workspace.workspaceFolders[1].uri.path;
+        const files = await workspace.findFiles('**/*.thy');
+        await Promise.all(files.map(f => this.instance.createFromOriginal(f)));
     }
 
     public static getFileUri(isabelleUri: string): string{
@@ -94,17 +94,36 @@ export class IsabelleFSP implements FileSystemProvider {
 
 
     private root = new Directory('');
+    private rootPath: string;
     private isabelleToFile = new Map<string, string>();
     private fileToIsabelle = new Map<string, string>();
 
-    public async createFromOriginal(doc: TextDocument): Promise<Uri>{
-        const data = await workspace.fs.readFile(doc.uri);
+    public async initWorkspace(){
+        let parentUri = Uri.parse(`${IsabelleFSP.scheme}:/`);
+        workspace.updateWorkspaceFolders(0, 0, 
+            { 
+                uri: parentUri, 
+                name: "Isabelle - Files" 
+            }
+        );
+    }
 
-        const newUri = Uri.parse(`${IsabelleFSP.scheme}:/${path.basename(doc.fileName)}`);
+    private getPath(path: string) {
+        const re = new RegExp('^' + this.rootPath);
+        return path.replace(re, '')
+    }
+
+    public async createFromOriginal(uri: Uri): Promise<Uri>{
+        const data = await workspace.fs.readFile(uri);
+
+        const newUri = uri.with({
+            scheme: IsabelleFSP.scheme,
+            path: this.getPath(uri.path)
+        });
         const encodedData = IsabelleFSP.symbolEncoder.encode(data);
         this.writeFile(newUri, encodedData, {create: true, overwrite: true});
         const isabelleFile = newUri.toString();
-        const discFile = doc.uri.toString();
+        const discFile = uri.toString();
         this.isabelleToFile.set(isabelleFile, discFile);
         this.fileToIsabelle.set(discFile, isabelleFile);
 
@@ -121,7 +140,7 @@ export class IsabelleFSP implements FileSystemProvider {
         }
 
         return this.fileToIsabelle.get(doc.uri.toString()) || 
-            (await this.createFromOriginal(doc)).toString();
+            (await this.createFromOriginal(doc.uri)).toString();
     }
 
     private async syncOriginal(uri: Uri, content: Uint8Array){
@@ -157,7 +176,7 @@ export class IsabelleFSP implements FileSystemProvider {
         if(!IsabelleFSP.symbolEncoder) return;
 
         const basename = path.posix.basename(uri.path);
-        const parent = this._lookupParentDirectory(uri);
+        const parent = this._lookupParentDirectory(uri, true);
         let entry = parent.entries.get(basename);
         if (entry instanceof Directory) {
             throw FileSystemError.FileIsADirectory(uri);
@@ -192,7 +211,7 @@ export class IsabelleFSP implements FileSystemProvider {
 
     rename(oldUri: Uri, newUri: Uri, options: { overwrite: boolean }): void {
 
-        if (!options.overwrite && this._lookup(newUri, true)) {
+        if (!options.overwrite && this._lookup(newUri, false)) {
             throw FileSystemError.FileExists(newUri);
         }
 
@@ -239,9 +258,7 @@ export class IsabelleFSP implements FileSystemProvider {
 
     // --- lookup
 
-    private _lookup(uri: Uri, silent: false): Entry;
-    private _lookup(uri: Uri, silent: boolean): Entry | undefined;
-    private _lookup(uri: Uri, silent: boolean): Entry | undefined {
+    private _lookup(uri: Uri, silent: boolean, create?: boolean): Entry | undefined {
         const parts = uri.path.split('/');
         let entry: Entry = this.root;
         for (const part of parts) {
@@ -249,23 +266,31 @@ export class IsabelleFSP implements FileSystemProvider {
                 continue;
             }
             let child: Entry | undefined;
-            if (entry instanceof Directory) {
-                child = entry.entries.get(part);
-            }
-            if (!child) {
-                if (!silent) {
+            if (!(entry instanceof Directory))
+                if(!silent)
                     throw FileSystemError.FileNotFound(uri);
-                } else {
+                else
                     return undefined;
+
+            child = entry.entries.get(part);
+            if (!child) {
+                if(create){
+                    child = new Directory(part);
+                    entry.entries.set(part, child);
                 }
+
+                if(!silent)
+                    throw FileSystemError.FileNotFound(uri);
+                else
+                    return undefined;
             }
             entry = child;
         }
         return entry;
     }
 
-    private _lookupAsDirectory(uri: Uri, silent: boolean): Directory {
-        const entry = this._lookup(uri, silent);
+    private _lookupAsDirectory(uri: Uri, silent: boolean, create?: boolean): Directory {
+        const entry = this._lookup(uri, silent, create);
         if (entry instanceof Directory) {
             return entry;
         }
@@ -280,9 +305,9 @@ export class IsabelleFSP implements FileSystemProvider {
         throw FileSystemError.FileIsADirectory(uri);
     }
 
-    private _lookupParentDirectory(uri: Uri): Directory {
+    private _lookupParentDirectory(uri: Uri, create?: boolean): Directory {
         const dirname = uri.with({ path: path.posix.dirname(uri.path) });
-        return this._lookupAsDirectory(dirname, false);
+        return this._lookupAsDirectory(dirname, false, create);
     }
 
     // --- manage file events
