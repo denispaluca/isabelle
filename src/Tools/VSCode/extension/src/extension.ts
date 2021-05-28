@@ -43,7 +43,7 @@ export function activate(context: ExtensionContext)
           
     const language_client_options: LanguageClientOptions = {
       documentSelector: [
-        { language: "isabelle", scheme: "file" },
+        /* { language: "isabelle", scheme: "file" }, */
         { language: "isabelle", scheme: IsabelleFSP.scheme },
         { language: "isabelle-ml", scheme: "file" },
         { language: "bibtex", scheme: "file" }

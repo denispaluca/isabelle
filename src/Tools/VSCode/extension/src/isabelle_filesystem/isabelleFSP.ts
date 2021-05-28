@@ -1,8 +1,9 @@
 import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChangeType, 
     FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, 
-    TextDocument, commands, window } from "vscode";
+    TextDocument, commands, window, ViewColumn } from "vscode";
 import * as path from 'path';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
+import { p2c } from "../extension";
 
 export class File implements FileStat {
 
@@ -45,10 +46,6 @@ export class Directory implements FileStat {
 
 export type Entry = File | Directory;
 
-function waitForNextTick(): Promise<void> {
-	return new Promise((res) => setTimeout(res, 0));
-}
-
 export class IsabelleFSP implements FileSystemProvider {
 
     root = new Directory('');
@@ -69,10 +66,21 @@ export class IsabelleFSP implements FileSystemProvider {
                 if(document.languageId !== 'isabelle') return;
                 if(!this.symbolEncoder) return;
 
-                //commands.executeCommand('workbench.action.closeActiveEditor');
+                await isabelleFSP.createFromOriginal(document);
+            }),
+            window.onDidChangeActiveTextEditor(async te => {
+                const {document} = te;
+                if(document.uri.scheme !== 'file') return;
+                if(document.languageId !== 'isabelle') return;
+                if(!this.symbolEncoder) return;
 
-                const newUri = await isabelleFSP.createFromOriginal(document);
-                // window.showTextDocument(newUri);
+                let newUri = p2c(document.uri.toString());
+                if(newUri.scheme === 'file'){
+                    newUri = await isabelleFSP.createFromOriginal(document);
+                }
+
+                await commands.executeCommand('workbench.action.closeActiveEditor');
+                await commands.executeCommand('vscode.open', newUri, ViewColumn.Active);
             })
         );
         workspace.updateWorkspaceFolders(0, 0, 
@@ -81,16 +89,6 @@ export class IsabelleFSP implements FileSystemProvider {
                 name: "Isabelle - Files" 
             }
         );
-    }
-
-    private static async openNewDoc(isabelleFSP: IsabelleFSP, document: TextDocument) {
-        workspace.onDidCloseTextDocument(async doc => {
-            if(doc.uri.toString() !== document.uri.toString()) return;
-            const newUri = await isabelleFSP.createFromOriginal(document);
-            const newDoc = await workspace.openTextDocument(newUri);
-            window.showTextDocument(newDoc);
-        });
-        await commands.executeCommand('workbench.action.closeActiveEditor');
     }
 
     public static updateSymbolEncoder(entries: SymbolEntry[]) {
