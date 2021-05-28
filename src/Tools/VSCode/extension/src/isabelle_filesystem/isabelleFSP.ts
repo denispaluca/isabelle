@@ -71,15 +71,17 @@ export class IsabelleFSP implements FileSystemProvider {
             })
         );
         
-        this.instance.initWorkspace();
+        workspace.updateWorkspaceFolders(0, 0, 
+            { 
+                uri: Uri.parse(`${IsabelleFSP.scheme}:/`), 
+                name: "Isabelle - Files" 
+            }
+        );
     }
 
-    public static async updateSymbolEncoder(entries: SymbolEntry[]) {
+    public static updateSymbolEncoder(entries: SymbolEntry[]) {
         this.symbolEncoder = new SymbolEncoder(entries);
-
-        this.instance.rootPath = workspace.workspaceFolders[1].uri.path;
-        const files = await workspace.findFiles('**/*.thy');
-        await Promise.all(files.map(f => this.instance.createFromOriginal(f)));
+        this.instance.initWorkspace();
     }
 
     public static getFileUri(isabelleUri: string): string{
@@ -99,13 +101,9 @@ export class IsabelleFSP implements FileSystemProvider {
     private fileToIsabelle = new Map<string, string>();
 
     public async initWorkspace(){
-        let parentUri = Uri.parse(`${IsabelleFSP.scheme}:/`);
-        workspace.updateWorkspaceFolders(0, 0, 
-            { 
-                uri: parentUri, 
-                name: "Isabelle - Files" 
-            }
-        );
+        this.rootPath = workspace.workspaceFolders[1].uri.path;
+        const files = await workspace.findFiles('**/*.thy');
+        await Promise.all(files.map(f => this.createFromOriginal(f)));
     }
 
     private getPath(path: string) {
@@ -277,9 +275,7 @@ export class IsabelleFSP implements FileSystemProvider {
                 if(create){
                     child = new Directory(part);
                     entry.entries.set(part, child);
-                }
-
-                if(!silent)
+                } else if(!silent)
                     throw FileSystemError.FileNotFound(uri);
                 else
                     return undefined;
