@@ -3,6 +3,7 @@ import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChang
     TextDocument, commands, window, ViewColumn } from "vscode";
 import * as path from 'path';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
+import { Session } from "../protocol";
 
 export class File implements FileStat {
 
@@ -52,7 +53,7 @@ export class IsabelleFSP implements FileSystemProvider {
     private static symbolEncoder: SymbolEncoder;
     private static instance: IsabelleFSP;
 
-    public static async register(context: ExtensionContext) {
+    public static register(context: ExtensionContext) {
         this.instance = new IsabelleFSP();
 
         context.subscriptions.push(
@@ -60,7 +61,7 @@ export class IsabelleFSP implements FileSystemProvider {
                 this.scheme, 
                 this.instance
             ),
-            workspace.onDidOpenTextDocument(this.instance.decideToCreate),
+            workspace.onDidOpenTextDocument((d) => this.instance.decideToCreate(d)),
             window.onDidChangeActiveTextEditor(async ({document}) => {
                 const newUri = await this.instance.decideToCreate(document);
 
@@ -74,14 +75,13 @@ export class IsabelleFSP implements FileSystemProvider {
         workspace.updateWorkspaceFolders(0, 0, 
             { 
                 uri: Uri.parse(`${IsabelleFSP.scheme}:/`), 
-                name: "Isabelle - Files" 
+                name: "Isabelle - Theories" 
             }
         );
     }
 
     public static updateSymbolEncoder(entries: SymbolEntry[]) {
         this.symbolEncoder = new SymbolEncoder(entries);
-        this.instance.initWorkspace();
     }
 
     public static getFileUri(isabelleUri: string): string{
@@ -92,32 +92,39 @@ export class IsabelleFSP implements FileSystemProvider {
         return this.instance.fileToIsabelle.get(fileUri) || fileUri;
     }
 
+    public static initWorkspace(sessions: Session[]){
+        this.instance.init(sessions);
+    }
+
     //#endregion
 
 
     private root = new Directory('');
-    private rootPath: string;
     private isabelleToFile = new Map<string, string>();
     private fileToIsabelle = new Map<string, string>();
 
-    public async initWorkspace(){
-        this.rootPath = workspace.workspaceFolders[1].uri.path;
-        const files = await workspace.findFiles('**/*.thy');
-        await Promise.all(files.map(f => this.createFromOriginal(f)));
+    private async init(sessions: Session[]){
+        for(const {name} of sessions){
+            if(!name) continue;
+            this.createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${name}`));
+        }
+
+        const promises = sessions.map(
+            ({name, sources}) => sources.map(
+                s => this.createFromOriginal(Uri.parse(s), name)
+            )
+        ).reduce((x, y) => x.concat(y), []);
+
+        await Promise.all(promises);
     }
 
-    private getPath(path: string) {
-        const re = new RegExp('^' + this.rootPath);
-        return path.replace(re, '')
-    }
-
-    public async createFromOriginal(uri: Uri): Promise<Uri>{
+    public async createFromOriginal(uri: Uri, sessionName: string): Promise<Uri>{
         const data = await workspace.fs.readFile(uri);
 
-        const newUri = uri.with({
-            scheme: IsabelleFSP.scheme,
-            path: this.getPath(uri.path)
-        });
+        const newUri = Uri.parse(
+            IsabelleFSP.scheme + ':' +
+            path.posix.join('/',sessionName, path.basename(uri.fsPath))
+        );
         const encodedData = IsabelleFSP.symbolEncoder.encode(data);
         this.writeFile(newUri, encodedData, {create: true, overwrite: true});
         const isabelleFile = newUri.toString();
@@ -137,8 +144,16 @@ export class IsabelleFSP implements FileSystemProvider {
             return;
         }
 
-        return this.fileToIsabelle.get(doc.uri.toString()) || 
-            (await this.createFromOriginal(doc.uri)).toString();
+        const { uri } = doc;
+        const isabelleUri = this.fileToIsabelle.get(uri.toString());
+        if(isabelleUri){
+            return isabelleUri;
+        }
+
+        const sessionName = path.posix.basename(path.posix.dirname(uri.fsPath));
+        const createdUri = await this.createFromOriginal(uri, sessionName);
+
+        return createdUri.toString();
     }
 
     private async syncOriginal(uri: Uri, content: Uint8Array){

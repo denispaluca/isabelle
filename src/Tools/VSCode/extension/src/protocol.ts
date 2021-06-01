@@ -106,10 +106,15 @@ export const preview_response_type =
 
 
 /* Isabelle symbols */
+export interface Session {
+  name: string;
+  sources: string[]
+}
 
 export interface Symbols
 {
-  entries: [SymbolEntry]
+  entries: [SymbolEntry];
+  sessions: Session[];
 }
 
 export const symbols_type =

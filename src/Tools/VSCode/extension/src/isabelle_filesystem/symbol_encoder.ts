@@ -63,21 +63,16 @@ export class SymbolEncoder {
             }
 
             let word: number[] = [];
-            let found: boolean = false;
             let node: TreeNode;
             for(let j = i; j < i + origin.maxLength; j++){
                 word.push(content[j]);
                 node = origin.prefixTree.getNode(word);
-                if(!node){
-                    break;
-                }
-                if(node.end){
-                    found = true;
+                if(!node || node.end){
                     break;
                 }
             }
             
-            if(found){
+            if(node && node.end){
                 result.push(...node.value);
                 i += word.length - 1;
                 continue;

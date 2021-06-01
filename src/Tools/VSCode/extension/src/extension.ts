@@ -28,8 +28,10 @@ export function activate(context: ExtensionContext)
     window.showErrorMessage("Missing user settings: isabelle.home")
   else {
     IsabelleFSP.register(context);
+    const discFolder = workspace.workspaceFolders[1].uri.fsPath;
     const isabelle_tool = isabelle_home + "/bin/isabelle"
     const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions", 
+    '-d', discFolder
       /* '-L', '/home/denis/Desktop/logi.log', '-v' */]
 
     const server_options: ServerOptions =
@@ -158,7 +160,10 @@ export function activate(context: ExtensionContext)
     language_client.onReady().then(() =>
     {
       language_client.onNotification(protocol.symbols_type,
-        params => IsabelleFSP.updateSymbolEncoder(params.entries))
+        params => {
+          IsabelleFSP.updateSymbolEncoder(params.entries);
+          IsabelleFSP.initWorkspace(params.sessions);
+        })
       language_client.sendNotification(protocol.symbols_request_type)
     })
 
