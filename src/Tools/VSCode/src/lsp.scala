@@ -621,22 +621,27 @@ object LSP
 
   object Symbols
   {
-    def apply(session_dirs: List[Path]): JSON.T =
+    def apply(): JSON.T =
     {
-      val sessions_structure = Sessions
-        .load_structure(Options.init(), select_dirs = session_dirs)
-        .selection(Sessions.Selection.empty)
-      val bases = Sessions.deps(sessions_structure).session_bases
-      val sessions = for {
-        (name, base) <- bases
-        sources = base
-          .session_theories
-          .map(_.path.absolute_file.toURI.toString)
-      } yield JSON.Object ("name" -> name, "sources" -> sources)
       val entries =
         for ((sym, code) <- Symbol.codes)
         yield JSON.Object("symbol" -> sym, "name" -> Symbol.names(sym)._1, "code" -> code)
-      Notification("PIDE/symbols", JSON.Object("entries" -> entries, "sessions" -> sessions))
+      Notification("PIDE/symbols", JSON.Object("entries" -> entries))
+    }
+  }
+
+  object Session_Theories_Request extends Notification0("PIDE/session_theories_request")
+
+  object Session_Theories {
+    def apply(session_theories: Map[String, List[String]]): JSON.T = {
+      val entries = session_theories.map { case(session_name, theories) => JSON.Object(
+        "session_name" -> session_name,
+        "theories" -> theories
+      )}
+      Notification(
+        "PIDE/session_theories",
+        JSON.Object("entries" -> entries)
+      )
     }
   }
 }

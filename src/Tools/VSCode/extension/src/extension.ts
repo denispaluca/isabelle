@@ -31,7 +31,7 @@ export function activate(context: ExtensionContext)
     const discFolder = workspace.workspaceFolders[1].uri.fsPath;
     const isabelle_tool = isabelle_home + "/bin/isabelle"
     const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions", 
-    '-d', discFolder
+    '-D', discFolder
       /* '-L', '/home/denis/Desktop/logi.log', '-v' */]
 
     const server_options: ServerOptions =
@@ -159,11 +159,16 @@ export function activate(context: ExtensionContext)
 
     language_client.onReady().then(() =>
     {
+      language_client.onNotification(protocol.session_theories_type,
+        ({entries}) => IsabelleFSP.initWorkspace(entries));
       language_client.onNotification(protocol.symbols_type,
         params => {
           IsabelleFSP.updateSymbolEncoder(params.entries);
-          IsabelleFSP.initWorkspace(params.sessions);
-        })
+
+          //request theories to load in isabelle file system 
+          //after a valid symbol encoder is loaded
+          language_client.sendNotification(protocol.session_theories_request_type);
+        });
       language_client.sendNotification(protocol.symbols_request_type)
     })
 

@@ -3,7 +3,7 @@ import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChang
     TextDocument, commands, window, ViewColumn } from "vscode";
 import * as path from 'path';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
-import { Session } from "../protocol";
+import { SessionTheories } from "../protocol";
 
 export class File implements FileStat {
 
@@ -92,7 +92,7 @@ export class IsabelleFSP implements FileSystemProvider {
         return this.instance.fileToIsabelle.get(fileUri) || fileUri;
     }
 
-    public static initWorkspace(sessions: Session[]){
+    public static initWorkspace(sessions: SessionTheories[]){
         this.instance.init(sessions);
     }
 
@@ -103,15 +103,15 @@ export class IsabelleFSP implements FileSystemProvider {
     private isabelleToFile = new Map<string, string>();
     private fileToIsabelle = new Map<string, string>();
 
-    private async init(sessions: Session[]){
-        for(const {name} of sessions){
-            if(!name) continue;
-            this.createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${name}`));
+    private async init(sessions: SessionTheories[]){
+        for(const { session_name } of sessions){
+            if(!session_name) continue;
+            this.createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${session_name}`));
         }
 
         const promises = sessions.map(
-            ({name, sources}) => sources.map(
-                s => this.createFromOriginal(Uri.parse(s), name)
+            ({session_name, theories}) => theories.map(
+                s => this.createFromOriginal(Uri.parse(s), session_name)
             )
         ).reduce((x, y) => x.concat(y), []);
 
