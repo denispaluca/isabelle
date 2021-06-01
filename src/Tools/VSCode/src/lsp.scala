@@ -621,12 +621,22 @@ object LSP
 
   object Symbols
   {
-    def apply(): JSON.T =
+    def apply(session_dirs: List[Path]): JSON.T =
     {
+      val sessions_structure = Sessions
+        .load_structure(Options.init(), select_dirs = session_dirs)
+        .selection(Sessions.Selection.empty)
+      val bases = Sessions.deps(sessions_structure).session_bases
+      val sessions = for {
+        (name, base) <- bases
+        sources = base
+          .session_theories
+          .map(_.path.absolute_file.toURI.toString)
+      } yield JSON.Object ("name" -> name, "sources" -> sources)
       val entries =
         for ((sym, code) <- Symbol.codes)
         yield JSON.Object("symbol" -> sym, "name" -> Symbol.names(sym)._1, "code" -> code)
-      Notification("PIDE/symbols", JSON.Object("entries" -> entries))
+      Notification("PIDE/symbols", JSON.Object("entries" -> entries, "sessions" -> sessions))
     }
   }
 }
