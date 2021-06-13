@@ -2,7 +2,6 @@ import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChang
     FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, 
     TextDocument, commands, window, ViewColumn } from "vscode";
 import * as path from 'path';
-import * as fs from 'fs';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
 import { SessionTheories } from "../protocol";
 
@@ -62,9 +61,9 @@ export class IsabelleFSP implements FileSystemProvider {
                 this.scheme, 
                 this.instance
             ),
-            workspace.onDidOpenTextDocument((d) => this.instance.decideToCreate(d)),
+            workspace.onDidOpenTextDocument((d) => this.instance.decideToCreate(d.uri, d.languageId)),
             window.onDidChangeActiveTextEditor(async ({document}) => {
-                const newUri = await this.instance.decideToCreate(document);
+                const newUri = await this.instance.decideToCreate(document.uri, document.languageId);
 
                 if(!newUri) return;
 
@@ -116,15 +115,7 @@ export class IsabelleFSP implements FileSystemProvider {
             }
             this.delete(Uri.parse(isabelleFile));
         });
-        watcher.onDidCreate(uri => {
-            const file = uri.toString();
-            const session = this.sessionTheories.find((s) => s.theories.includes(file));
-            if(!session){
-                return;
-            }
-
-            this.createFromOriginal(uri, session.session_name);
-        });
+        watcher.onDidCreate(uri => this.decideToCreate(uri, 'isabelle'));
 
         return watcher;
     }
@@ -181,31 +172,43 @@ export class IsabelleFSP implements FileSystemProvider {
             path.posix.join('/',sessionName, path.basename(uri.fsPath))
         );
         const encodedData = IsabelleFSP.symbolEncoder.encode(data);
-        this.writeFile(newUri, encodedData, {create: true, overwrite: true});
+
         const isabelleFile = newUri.toString();
         const discFile = uri.toString();
         this.isabelleToFile.set(isabelleFile, discFile);
         this.fileToIsabelle.set(discFile, isabelleFile);
 
+        await this.writeFile(newUri, encodedData, {create: true, overwrite: true});
+
         return newUri;
     }
 
-    public async decideToCreate(doc: TextDocument): Promise<string | undefined> {
+    public getTheorySession(uri: string): string {
+        const session = this.sessionTheories.find((s) => s.theories.includes(uri));
+        if(!session){
+            return 'Draft';
+        }
+
+        return session.session_name;
+    }
+
+    public async decideToCreate(uri: Uri, languageId: string): Promise<string | undefined> {
         if(
-            doc.uri.scheme !== 'file' ||
-            doc.languageId !== 'isabelle' ||
+            uri.scheme !== 'file' ||
+            languageId !== 'isabelle' ||
             !IsabelleFSP.symbolEncoder
         ){
             return;
         }
 
-        const { uri } = doc;
-        const isabelleUri = this.fileToIsabelle.get(uri.toString());
+        const uriString = uri.toString();
+        const isabelleUri = this.fileToIsabelle.get(uriString);
         if(isabelleUri){
             return isabelleUri;
         }
 
-        const createdUri = await this.createFromOriginal(uri, 'Draft');
+        const session = this.getTheorySession(uriString);
+        const createdUri = await this.createFromOriginal(uri, session);
 
         return createdUri.toString();
     }
@@ -258,6 +261,7 @@ export class IsabelleFSP implements FileSystemProvider {
         if(entry){
             if(options.create){
                 this.syncOriginal(uri, content);
+                return;
             }
 
             entry.mtime = Date.now();
