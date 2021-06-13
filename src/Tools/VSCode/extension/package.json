@@ -31,6 +31,16 @@
     "contributes": {
         "commands": [
             {
+                "command": "isabelle.reload-workspace",
+                "title": "Reload Workspace",
+                "category": "Isabelle"
+            },
+            {
+                "command": "isabelle.reload-file",
+                "title": "Reload File",
+                "category": "Isabelle"
+            },
+            {
                 "command": "isabelle.state",
                 "title": "Show State",
                 "category": "Isabelle"

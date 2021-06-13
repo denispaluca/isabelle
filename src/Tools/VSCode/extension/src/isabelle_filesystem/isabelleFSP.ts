@@ -61,7 +61,9 @@ export class IsabelleFSP implements FileSystemProvider {
                 this.scheme, 
                 this.instance
             ),
+            
             workspace.onDidOpenTextDocument((d) => this.instance.decideToCreate(d.uri, d.languageId)),
+            
             window.onDidChangeActiveTextEditor(async ({document}) => {
                 const newUri = await this.instance.decideToCreate(document.uri, document.languageId);
 
@@ -70,7 +72,19 @@ export class IsabelleFSP implements FileSystemProvider {
                 await commands.executeCommand('workbench.action.closeActiveEditor');
                 await commands.executeCommand('vscode.open', Uri.parse(newUri), ViewColumn.Active);
             }),
-            this.instance.syncFromOriginal()
+
+            this.instance.syncFromOriginal(),
+
+            commands.registerCommand('isabelle.reload-workspace', 
+                () => this.instance.reloadWorkspace()),
+
+            commands.registerTextEditorCommand(
+                'isabelle.reload-file', 
+                (e) => {
+                    const fileUri = this.getFileUri(e.document.uri.toString());
+                    this.instance.reloadFile(Uri.parse(fileUri));
+                }
+            )
         );
         
         workspace.updateWorkspaceFolders(0, 0, 
@@ -142,6 +156,10 @@ export class IsabelleFSP implements FileSystemProvider {
         const encodedData = IsabelleFSP.symbolEncoder.encode(data);
         const isabelleUri = Uri.parse(isabelleFile);
         this.writeFile(isabelleUri, encodedData, {create: false, overwrite: true});
+    }
+
+    private reloadWorkspace(){
+        this.init(this.sessionTheories);
     }
 
     private async init(sessions: SessionTheories[]){
