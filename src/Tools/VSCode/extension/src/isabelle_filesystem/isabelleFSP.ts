@@ -2,6 +2,7 @@ import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChang
     FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, 
     TextDocument, commands, window, ViewColumn } from "vscode";
 import * as path from 'path';
+import * as fs from 'fs';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
 import { SessionTheories } from "../protocol";
 
@@ -69,7 +70,8 @@ export class IsabelleFSP implements FileSystemProvider {
 
                 await commands.executeCommand('workbench.action.closeActiveEditor');
                 await commands.executeCommand('vscode.open', Uri.parse(newUri), ViewColumn.Active);
-            })
+            }),
+            this.instance.syncFromOriginal()
         );
         
         workspace.updateWorkspaceFolders(0, 0, 
@@ -102,6 +104,32 @@ export class IsabelleFSP implements FileSystemProvider {
     private root = new Directory('');
     private isabelleToFile = new Map<string, string>();
     private fileToIsabelle = new Map<string, string>();
+
+    private syncFromOriginal(): Disposable {
+        const watcher = workspace.createFileSystemWatcher("**/*.thy", true);
+        watcher.onDidChange(uri => this.reloadFile(uri));
+        watcher.onDidDelete(uri => {
+            const isabelleFile = this.fileToIsabelle.get(uri.toString());
+            if(!isabelleFile){
+                return;
+            }
+            this.delete(Uri.parse(isabelleFile));
+        })
+
+        return watcher;
+    }
+
+    private async reloadFile(fileUri: Uri){
+        const isabelleFile = this.fileToIsabelle.get(fileUri.toString());
+        if(!isabelleFile){
+            return;
+        }
+
+        const data = await workspace.fs.readFile(fileUri);
+        const encodedData = IsabelleFSP.symbolEncoder.encode(data);
+        const isabelleUri = Uri.parse(isabelleFile);
+        this.writeFile(isabelleUri, encodedData, {create: false, overwrite: true});
+    }
 
     private async init(sessions: SessionTheories[]){
         for(const { session_name } of sessions){
@@ -202,7 +230,9 @@ export class IsabelleFSP implements FileSystemProvider {
         }
 
         if(entry){
-            this.syncOriginal(uri, content);
+            if(options.create){
+                this.syncOriginal(uri, content);
+            }
 
             entry.mtime = Date.now();
             entry.size = content.byteLength;
