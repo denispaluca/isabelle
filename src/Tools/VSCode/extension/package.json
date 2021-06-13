@@ -23,12 +23,9 @@
         "Programming Languages"
     ],
     "activationEvents": [
-		"onFileSystem:isabelle",
-        "onLanguage:isabelle",
-        "onLanguage:isabelle-ml",
-        "onLanguage:bibtex",
-        "onCommand:isabelle.preview",
-        "onCommand:isabelle.preview-split"
+        "workspaceContains:ROOT",
+        "workspaceContains:ROOTS",
+		"onFileSystem:isabelle"
     ],
     "main": "./out/src/extension",
     "contributes": {
