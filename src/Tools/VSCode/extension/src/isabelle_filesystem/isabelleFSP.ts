@@ -119,6 +119,18 @@ export class IsabelleFSP implements FileSystemProvider {
         return watcher;
     }
 
+    private syncDeletion(uri: Uri) {
+        const isabelleFile = uri.toString();
+        const file = this.isabelleToFile.get(isabelleFile);
+        if(!file){
+            return;
+        }
+        workspace.fs.delete(Uri.parse(file));
+        this.isabelleToFile.delete(isabelleFile);
+        this.fileToIsabelle.delete(file);
+    }
+
+
     private async reloadFile(fileUri: Uri){
         const isabelleFile = this.fileToIsabelle.get(fileUri.toString());
         if(!isabelleFile){
@@ -284,6 +296,9 @@ export class IsabelleFSP implements FileSystemProvider {
         parent.entries.delete(basename);
         parent.mtime = Date.now();
         parent.size -= 1;
+
+        this.syncDeletion(uri);
+
         this._fireSoon({ type: FileChangeType.Changed, uri: dirname }, { uri, type: FileChangeType.Deleted });
     }
 
