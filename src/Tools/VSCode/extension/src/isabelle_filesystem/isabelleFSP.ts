@@ -104,9 +104,10 @@ export class IsabelleFSP implements FileSystemProvider {
     private root = new Directory('');
     private isabelleToFile = new Map<string, string>();
     private fileToIsabelle = new Map<string, string>();
+    private sessionTheories: SessionTheories[] = [];
 
     private syncFromOriginal(): Disposable {
-        const watcher = workspace.createFileSystemWatcher("**/*.thy", true);
+        const watcher = workspace.createFileSystemWatcher("**/*.thy");
         watcher.onDidChange(uri => this.reloadFile(uri));
         watcher.onDidDelete(uri => {
             const isabelleFile = this.fileToIsabelle.get(uri.toString());
@@ -114,7 +115,16 @@ export class IsabelleFSP implements FileSystemProvider {
                 return;
             }
             this.delete(Uri.parse(isabelleFile));
-        })
+        });
+        watcher.onDidCreate(uri => {
+            const file = uri.toString();
+            const session = this.sessionTheories.find((s) => s.theories.includes(file));
+            if(!session){
+                return;
+            }
+
+            this.createFromOriginal(uri, session.session_name);
+        });
 
         return watcher;
     }
@@ -144,6 +154,11 @@ export class IsabelleFSP implements FileSystemProvider {
     }
 
     private async init(sessions: SessionTheories[]){
+        this.sessionTheories = sessions.map(({session_name, theories}) => ({
+            session_name,
+            theories: theories.map(t => Uri.parse(t).toString())
+        }));
+
         for(const { session_name } of sessions){
             if(!session_name) continue;
             this.createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${session_name}`));
@@ -190,8 +205,7 @@ export class IsabelleFSP implements FileSystemProvider {
             return isabelleUri;
         }
 
-        const sessionName = path.posix.basename(path.posix.dirname(uri.fsPath));
-        const createdUri = await this.createFromOriginal(uri, sessionName);
+        const createdUri = await this.createFromOriginal(uri, 'Draft');
 
         return createdUri.toString();
     }
