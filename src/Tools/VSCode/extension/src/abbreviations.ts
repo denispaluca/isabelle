@@ -1,5 +1,5 @@
 import { ExtensionContext, Range, TextDocumentContentChangeEvent, workspace, WorkspaceEdit } from "vscode";
-import { SymbolEntry } from "./symbol_encoder";
+import { SymbolEntry } from "./isabelle_filesystem/symbol_encoder";
 
 const entries: Record<string, string> = {};
 
