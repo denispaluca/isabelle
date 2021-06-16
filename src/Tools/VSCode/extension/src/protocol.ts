@@ -2,7 +2,7 @@
 
 import { MarkdownString } from 'vscode'
 import { NotificationType } from 'vscode-languageclient';
-import { SymbolEntry } from './symbol_encoder';
+import { SymbolEntry } from './isabelle_filesystem/symbol_encoder';
 
 /* decorations */
 
@@ -109,7 +109,7 @@ export const preview_response_type =
 
 export interface Symbols
 {
-  entries: [SymbolEntry]
+  entries: [SymbolEntry];
 }
 
 export const symbols_type =
@@ -118,6 +118,19 @@ export const symbols_type =
 export const symbols_request_type =
   new NotificationType<void, void>("PIDE/symbols_request")
 
+export interface Entries<T> {
+  entries: T[];
+}
+
+export interface SessionTheories {
+  session_name: string;
+  theories: string[]
+}
+export const session_theories_type =
+  new NotificationType<Entries<SessionTheories>, void>("PIDE/session_theories")
+
+export const session_theories_request_type =
+  new NotificationType<void, void>("PIDE/session_theories_request")
 
 /* spell checker */
 

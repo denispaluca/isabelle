@@ -634,4 +634,19 @@ object LSP
       Notification("PIDE/symbols", JSON.Object("entries" -> entries))
     }
   }
+
+  object Session_Theories_Request extends Notification0("PIDE/session_theories_request")
+
+  object Session_Theories {
+    def apply(session_theories: Map[String, List[String]]): JSON.T = {
+      val entries = session_theories.map { case(session_name, theories) => JSON.Object(
+        "session_name" -> session_name,
+        "theories" -> theories
+      )}
+      Notification(
+        "PIDE/session_theories",
+        JSON.Object("entries" -> entries)
+      )
+    }
+  }
 }

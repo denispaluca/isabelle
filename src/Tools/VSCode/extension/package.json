@@ -1,5 +1,5 @@
 {
-    "name": "Isabelle",
+    "name": "isabelle-vscode",
     "displayName": "Isabelle",
     "description": "Isabelle Prover IDE",
     "keywords": [
@@ -23,16 +23,23 @@
         "Programming Languages"
     ],
     "activationEvents": [
-		"onFileSystem:isabelle",
-        "onLanguage:isabelle",
-        "onLanguage:isabelle-ml",
-        "onLanguage:bibtex",
-        "onCommand:isabelle.preview",
-        "onCommand:isabelle.preview-split"
+        "workspaceContains:ROOT",
+        "workspaceContains:ROOTS",
+		"onFileSystem:isabelle"
     ],
     "main": "./out/src/extension",
     "contributes": {
         "commands": [
+            {
+                "command": "isabelle.reload-workspace",
+                "title": "Reload Workspace",
+                "category": "Isabelle"
+            },
+            {
+                "command": "isabelle.reload-file",
+                "title": "Reload File",
+                "category": "Isabelle"
+            },
             {
                 "command": "isabelle.state",
                 "title": "Show State",
