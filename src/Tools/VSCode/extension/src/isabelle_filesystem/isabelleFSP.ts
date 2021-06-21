@@ -64,7 +64,7 @@ export class IsabelleFSP implements FileSystemProvider {
             
             workspace.onDidOpenTextDocument((d) => {
                 if(d.uri.scheme === this.scheme){
-                    languages.setTextDocumentLanguage(d, 'isabelle');
+                    this.instance.prepareTheory(d);
                     return;
                 }
                 this.instance.decideToCreate(d.uri, d.languageId);
@@ -148,6 +148,21 @@ export class IsabelleFSP implements FileSystemProvider {
         watcher.onDidCreate(uri => this.decideToCreate(uri, 'isabelle'));
 
         return watcher;
+    }
+
+    private async prepareTheory(doc: TextDocument){
+        languages.setTextDocumentLanguage(doc, 'isabelle');
+        const uriString = doc.uri.toString();
+        const file = this.isabelleToFile.get(uriString);
+        if(!file){
+            return;
+        }
+
+        const found = (await workspace.findFiles('**/*.thy'))
+            .find(uri => uri.toString() === file);
+        if(!found){
+            window.showWarningMessage('Theory may or may not be synced with disc file!');
+        }
     }
 
     private syncDeletion(uri: Uri) {
