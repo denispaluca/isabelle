@@ -8,7 +8,7 @@ import * as protocol from './protocol';
 import * as state_panel from './state_panel';
 import * as completion from './completion';
 import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, workspace, window,
-  commands, languages } from 'vscode';
+  commands, languages, ProgressLocation } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient';
 import { IsabelleFSP } from './isabelle_filesystem/isabelleFSP';
 
@@ -59,6 +59,14 @@ export function activate(context: ExtensionContext)
     const language_client =
       new LanguageClient("Isabelle", server_options, language_client_options, false)
 
+    
+    window.withProgress({location: ProgressLocation.Notification, cancellable: false}, 
+      async (progress) => {
+        progress.report({
+          message: 'Waiting for Isabelle to start...'
+        });
+        return await language_client.onReady();
+    })
 
     /* decorations */
 
