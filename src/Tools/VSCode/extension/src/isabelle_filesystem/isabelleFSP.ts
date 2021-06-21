@@ -53,7 +53,7 @@ export class IsabelleFSP implements FileSystemProvider {
     private static symbolEncoder: SymbolEncoder;
     private static instance: IsabelleFSP;
 
-    public static register(context: ExtensionContext) {
+    public static register(context: ExtensionContext): string {
         this.instance = new IsabelleFSP();
 
         context.subscriptions.push(
@@ -109,6 +109,8 @@ export class IsabelleFSP implements FileSystemProvider {
                 name: "Isabelle - Theories" 
             }
         );
+
+        return workspace.workspaceFolders[1].uri.fsPath;
     }
 
     public static updateSymbolEncoder(entries: SymbolEntry[]) {
@@ -168,10 +170,6 @@ export class IsabelleFSP implements FileSystemProvider {
     private syncDeletion(uri: Uri) {
         const isabelleFile = uri.toString();
         const file = this.isabelleToFile.get(isabelleFile);
-        if(!file){
-            return;
-        }
-        workspace.fs.delete(Uri.parse(file));
         this.isabelleToFile.delete(isabelleFile);
         this.fileToIsabelle.delete(file);
     }
@@ -193,7 +191,13 @@ export class IsabelleFSP implements FileSystemProvider {
         this.init(this.sessionTheories);
     }
 
+    private resetWorkspace(){
+        this.isabelleToFile.clear();
+        this.fileToIsabelle.clear();
+        this.root.entries.clear();
+    }
     private async init(sessions: SessionTheories[]){
+        this.resetWorkspace();
         this.sessionTheories = sessions.map(({session_name, theories}) => ({
             session_name,
             theories: theories.map(t => Uri.parse(t).toString())

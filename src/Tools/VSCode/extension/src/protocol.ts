@@ -130,7 +130,7 @@ export const session_theories_type =
   new NotificationType<Entries<SessionTheories>, void>("PIDE/session_theories")
 
 export const session_theories_request_type =
-  new NotificationType<void, void>("PIDE/session_theories_request")
+  new NotificationType<void | { reset: boolean }, void>("PIDE/session_theories_request")
 
 /* spell checker */
 

@@ -120,6 +120,19 @@ class Language_Server(
   def resources: VSCode_Resources = session.resources.asInstanceOf[VSCode_Resources]
   private var session_theories = Map[String, List[String]]();
 
+  def load_session_theories(): Unit = {
+    val sessions_structure = Sessions
+      .load_structure(Options.init(), select_dirs = select_dirs)
+      .selection(Sessions.Selection.empty)
+    val bases = Sessions.deps(sessions_structure).session_bases
+    session_theories = for {
+      (name, base) <- bases
+      sources = base
+        .session_theories
+        .map(_.path.absolute_file.toURI.toString)
+    } yield (name, sources)
+  }
+
   def rendering_offset(node_pos: Line.Node_Position): Option[(VSCode_Rendering, Text.Offset)] =
     for {
       model <- resources.get_model(new JFile(node_pos.name))
@@ -268,16 +281,7 @@ class Language_Server(
 
     val try_session =
       try {
-        val sessions_structure = Sessions
-          .load_structure(Options.init(), select_dirs = select_dirs)
-          .selection(Sessions.Selection.empty)
-        val bases = Sessions.deps(sessions_structure).session_bases
-        session_theories = for {
-          (name, base) <- bases
-          sources = base
-            .session_theories
-            .map(_.path.absolute_file.toURI.toString)
-        } yield (name, sources)
+        load_session_theories()
 
         val base_info =
           Sessions.base_info(
@@ -482,7 +486,12 @@ class Language_Server(
           case LSP.State_Auto_Update(id, enabled) => State_Panel.auto_update(id, enabled)
           case LSP.Preview_Request(file, column) => request_preview(file, column)
           case LSP.Symbols_Request(()) => channel.write(LSP.Symbols())
-          case LSP.Session_Theories_Request(()) => channel.write(LSP.Session_Theories(session_theories))
+          case LSP.Session_Theories_Request(reset) => {
+            if(reset){
+              load_session_theories()
+            }
+            channel.write(LSP.Session_Theories(session_theories))
+          }
           case _ => if (!LSP.ResponseMessage.is_empty(json)) log("### IGNORED")
         }
       }

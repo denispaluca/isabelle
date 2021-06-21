@@ -27,8 +27,7 @@ export function activate(context: ExtensionContext)
   if (isabelle_home === "")
     window.showErrorMessage("Missing user settings: isabelle.home")
   else {
-    IsabelleFSP.register(context);
-    const discFolder = workspace.workspaceFolders[1].uri.fsPath;
+    const discFolder = IsabelleFSP.register(context);
     const isabelle_tool = isabelle_home + "/bin/isabelle"
     const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions", 
     '-D', discFolder
@@ -169,6 +168,7 @@ export function activate(context: ExtensionContext)
     {
       language_client.onNotification(protocol.session_theories_type,
         ({entries}) => IsabelleFSP.initWorkspace(entries));
+
       language_client.onNotification(protocol.symbols_type,
         params => {
           IsabelleFSP.updateSymbolEncoder(params.entries);
@@ -177,9 +177,22 @@ export function activate(context: ExtensionContext)
           //after a valid symbol encoder is loaded
           language_client.sendNotification(protocol.session_theories_request_type);
         });
-      language_client.sendNotification(protocol.symbols_request_type)
+
+      language_client.sendNotification(protocol.symbols_request_type);
+
+      //Reset system if changes to ROOT
     })
 
+    const watcher = workspace.createFileSystemWatcher({
+      base: discFolder,
+      pattern: '{ROOT,ROOTS}'
+    }, true, false, true);
+    watcher.onDidChange(() => 
+      language_client.sendNotification(
+        protocol.session_theories_request_type,
+        { reset: true}
+      ));
+    context.subscriptions.push(watcher)
 
     /* completion */
 
