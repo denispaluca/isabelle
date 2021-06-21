@@ -127,7 +127,7 @@ export class IsabelleFSP implements FileSystemProvider {
             if(!isabelleFile){
                 return;
             }
-            this.delete(Uri.parse(isabelleFile));
+            this._delete(Uri.parse(isabelleFile));
         });
         watcher.onDidCreate(uri => this.decideToCreate(uri, 'isabelle'));
 
@@ -170,7 +170,7 @@ export class IsabelleFSP implements FileSystemProvider {
 
         for(const { session_name } of sessions){
             if(!session_name) continue;
-            this.createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${session_name}`));
+            this._createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${session_name}`));
         }
 
         const promises = sessions.map(
@@ -262,6 +262,9 @@ export class IsabelleFSP implements FileSystemProvider {
 
     async writeFile(uri: Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
         if(!IsabelleFSP.symbolEncoder) return;
+        if(!this.isabelleToFile.get(uri.toString())){
+            throw FileSystemError.NoPermissions("No permission to create on Isabelle File System");
+        }
 
         const basename = path.posix.basename(uri.path);
         const parent = this._lookupParentDirectory(uri, true);
@@ -301,28 +304,10 @@ export class IsabelleFSP implements FileSystemProvider {
     // --- manage files/folders
 
     rename(oldUri: Uri, newUri: Uri, options: { overwrite: boolean }): void {
-
-        if (!options.overwrite && this._lookup(newUri, false)) {
-            throw FileSystemError.FileExists(newUri);
-        }
-
-        const entry = this._lookup(oldUri, false);
-        const oldParent = this._lookupParentDirectory(oldUri);
-
-        const newParent = this._lookupParentDirectory(newUri);
-        const newName = path.posix.basename(newUri.path);
-
-        oldParent.entries.delete(entry.name);
-        entry.name = newName;
-        newParent.entries.set(newName, entry);
-
-        this._fireSoon(
-            { type: FileChangeType.Deleted, uri: oldUri },
-            { type: FileChangeType.Created, uri: newUri }
-        );
+        throw FileSystemError.NoPermissions("No permission to rename on Isabelle File System");
     }
 
-    delete(uri: Uri): void {
+    private _delete(uri: Uri): void {
         const dirname = uri.with({ path: path.posix.dirname(uri.path) });
         const basename = path.posix.basename(uri.path);
         const parent = this._lookupAsDirectory(dirname, false);
@@ -338,7 +323,13 @@ export class IsabelleFSP implements FileSystemProvider {
         this._fireSoon({ type: FileChangeType.Changed, uri: dirname }, { uri, type: FileChangeType.Deleted });
     }
 
-    createDirectory(uri: Uri): void {
+    delete(uri: Uri): void {
+        throw FileSystemError.NoPermissions("No permission to delete on Isabelle File System");
+        //In case it needs to be reactivated
+        this._delete(uri);
+    }
+
+    private _createDirectory(uri: Uri): void {
         const basename = path.posix.basename(uri.path);
         const dirname = uri.with({ path: path.posix.dirname(uri.path) });
         const parent = this._lookupAsDirectory(dirname, false);
@@ -348,6 +339,12 @@ export class IsabelleFSP implements FileSystemProvider {
         parent.mtime = Date.now();
         parent.size += 1;
         this._fireSoon({ type: FileChangeType.Changed, uri: dirname }, { type: FileChangeType.Created, uri });
+    }
+
+    createDirectory(uri: Uri): void {
+        throw FileSystemError.NoPermissions("No permission to create on Isabelle File System");
+        //In case it needs to be reactivated
+        this._createDirectory(uri);
     }
 
     // --- lookup
