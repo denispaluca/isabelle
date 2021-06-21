@@ -75,6 +75,16 @@ export class IsabelleFSP implements FileSystemProvider {
 
                 if(!newUri) return;
 
+                const answer = await window.showInformationMessage(
+                    'Would you like to open the Isabelle theory associated with this file?', 
+                    'Yes', 
+                    'No'
+                )
+                
+                if(answer !== 'Yes'){
+                    return;
+                }
+
                 await commands.executeCommand('workbench.action.closeActiveEditor');
                 await commands.executeCommand('vscode.open', Uri.parse(newUri), ViewColumn.Active);
             }),
