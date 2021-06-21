@@ -1,6 +1,6 @@
 import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChangeType, 
     FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, 
-    TextDocument, commands, window, ViewColumn } from "vscode";
+    TextDocument, commands, window, ViewColumn, languages } from "vscode";
 import * as path from 'path';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
 import { SessionTheories } from "../protocol";
@@ -62,7 +62,13 @@ export class IsabelleFSP implements FileSystemProvider {
                 this.instance
             ),
             
-            workspace.onDidOpenTextDocument((d) => this.instance.decideToCreate(d.uri, d.languageId)),
+            workspace.onDidOpenTextDocument((d) => {
+                if(d.uri.scheme === this.scheme){
+                    languages.setTextDocumentLanguage(d, 'isabelle');
+                    return;
+                }
+                this.instance.decideToCreate(d.uri, d.languageId);
+            }),
             
             window.onDidChangeActiveTextEditor(async ({document}) => {
                 const newUri = await this.instance.decideToCreate(document.uri, document.languageId);
@@ -187,7 +193,7 @@ export class IsabelleFSP implements FileSystemProvider {
 
         const newUri = Uri.parse(
             IsabelleFSP.scheme + ':' +
-            path.posix.join('/',sessionName, path.basename(uri.fsPath))
+            path.posix.join('/',sessionName, path.basename(uri.fsPath, '.thy'))
         );
         const encodedData = IsabelleFSP.symbolEncoder.encode(data);
 
