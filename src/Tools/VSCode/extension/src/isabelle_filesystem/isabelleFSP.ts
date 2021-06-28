@@ -1,6 +1,8 @@
-import { FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChangeType, 
-    FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace, 
-    TextDocument, commands, window, ViewColumn } from "vscode";
+import {
+    FileStat, FileType, FileSystemProvider, Uri, FileSystemError, FileChangeType,
+    FileChangeEvent, Event, Disposable, EventEmitter, ExtensionContext, workspace,
+    TextDocument, commands, window, ViewColumn, languages
+} from "vscode";
 import * as path from 'path';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
 import { SessionTheories } from "../protocol";
@@ -53,21 +55,37 @@ export class IsabelleFSP implements FileSystemProvider {
     private static symbolEncoder: SymbolEncoder;
     private static instance: IsabelleFSP;
 
-    public static register(context: ExtensionContext) {
+    public static register(context: ExtensionContext): string {
         this.instance = new IsabelleFSP();
 
         context.subscriptions.push(
             workspace.registerFileSystemProvider(
-                this.scheme, 
+                this.scheme,
                 this.instance
             ),
-            
-            workspace.onDidOpenTextDocument((d) => this.instance.decideToCreate(d.uri, d.languageId)),
-            
-            window.onDidChangeActiveTextEditor(async ({document}) => {
+
+            workspace.onDidOpenTextDocument((d) => {
+                if (d.uri.scheme === this.scheme) {
+                    this.instance.prepareTheory(d);
+                    return;
+                }
+                this.instance.decideToCreate(d.uri, d.languageId);
+            }),
+
+            window.onDidChangeActiveTextEditor(async ({ document }) => {
                 const newUri = await this.instance.decideToCreate(document.uri, document.languageId);
 
-                if(!newUri) return;
+                if (!newUri) return;
+
+                const answer = await window.showInformationMessage(
+                    'Would you like to open the Isabelle theory associated with this file?',
+                    'Yes',
+                    'No'
+                )
+
+                if (answer !== 'Yes') {
+                    return;
+                }
 
                 await commands.executeCommand('workbench.action.closeActiveEditor');
                 await commands.executeCommand('vscode.open', Uri.parse(newUri), ViewColumn.Active);
@@ -75,39 +93,41 @@ export class IsabelleFSP implements FileSystemProvider {
 
             this.instance.syncFromOriginal(),
 
-            commands.registerCommand('isabelle.reload-workspace', 
+            commands.registerCommand('isabelle.reload-workspace',
                 () => this.instance.reloadWorkspace()),
 
             commands.registerTextEditorCommand(
-                'isabelle.reload-file', 
+                'isabelle.reload-file',
                 (e) => {
                     const fileUri = this.getFileUri(e.document.uri.toString());
                     this.instance.reloadFile(Uri.parse(fileUri));
                 }
             )
         );
-        
-        workspace.updateWorkspaceFolders(0, 0, 
-            { 
-                uri: Uri.parse(`${IsabelleFSP.scheme}:/`), 
-                name: "Isabelle - Theories" 
+
+        workspace.updateWorkspaceFolders(0, 0,
+            {
+                uri: Uri.parse(`${IsabelleFSP.scheme}:/`),
+                name: "Isabelle - Theories"
             }
         );
+
+        return workspace.workspaceFolders[1].uri.fsPath;
     }
 
     public static updateSymbolEncoder(entries: SymbolEntry[]) {
         this.symbolEncoder = new SymbolEncoder(entries);
     }
 
-    public static getFileUri(isabelleUri: string): string{
+    public static getFileUri(isabelleUri: string): string {
         return this.instance.isabelleToFile.get(isabelleUri) || isabelleUri;
     }
 
-    public static getIsabelleUri(fileUri: string): string{
-        return this.instance.fileToIsabelle.get(fileUri) || fileUri;
+    public static getIsabelleUri(fileUri: string): string {
+        return this.instance.fileToIsabelle.get(Uri.parse(fileUri).toString()) || fileUri;
     }
 
-    public static initWorkspace(sessions: SessionTheories[]){
+    public static initWorkspace(sessions: SessionTheories[]) {
         this.instance.init(sessions);
     }
 
@@ -124,57 +144,74 @@ export class IsabelleFSP implements FileSystemProvider {
         watcher.onDidChange(uri => this.reloadFile(uri));
         watcher.onDidDelete(uri => {
             const isabelleFile = this.fileToIsabelle.get(uri.toString());
-            if(!isabelleFile){
+            if (!isabelleFile) {
                 return;
             }
-            this.delete(Uri.parse(isabelleFile));
+            this._delete(Uri.parse(isabelleFile));
         });
         watcher.onDidCreate(uri => this.decideToCreate(uri, 'isabelle'));
 
         return watcher;
     }
 
+    private async prepareTheory(doc: TextDocument) {
+        languages.setTextDocumentLanguage(doc, 'isabelle');
+        const uriString = doc.uri.toString();
+        const file = this.isabelleToFile.get(uriString);
+        if (!file) {
+            return;
+        }
+
+        const found = (await workspace.findFiles('**/*.thy'))
+            .find(uri => uri.toString() === file);
+        if (!found) {
+            window.showWarningMessage('Theory may or may not be synced with disc file!');
+        }
+    }
+
     private syncDeletion(uri: Uri) {
         const isabelleFile = uri.toString();
         const file = this.isabelleToFile.get(isabelleFile);
-        if(!file){
-            return;
-        }
-        workspace.fs.delete(Uri.parse(file));
         this.isabelleToFile.delete(isabelleFile);
         this.fileToIsabelle.delete(file);
     }
 
 
-    private async reloadFile(fileUri: Uri){
+    private async reloadFile(fileUri: Uri) {
         const isabelleFile = this.fileToIsabelle.get(fileUri.toString());
-        if(!isabelleFile){
+        if (!isabelleFile) {
             return;
         }
 
         const data = await workspace.fs.readFile(fileUri);
         const encodedData = IsabelleFSP.symbolEncoder.encode(data);
         const isabelleUri = Uri.parse(isabelleFile);
-        this.writeFile(isabelleUri, encodedData, {create: false, overwrite: true});
+        this.writeFile(isabelleUri, encodedData, { create: false, overwrite: true });
     }
 
-    private reloadWorkspace(){
+    private reloadWorkspace() {
         this.init(this.sessionTheories);
     }
 
-    private async init(sessions: SessionTheories[]){
-        this.sessionTheories = sessions.map(({session_name, theories}) => ({
+    private resetWorkspace() {
+        this.isabelleToFile.clear();
+        this.fileToIsabelle.clear();
+        this.root.entries.clear();
+    }
+    private async init(sessions: SessionTheories[]) {
+        this.resetWorkspace();
+        this.sessionTheories = sessions.map(({ session_name, theories }) => ({
             session_name,
             theories: theories.map(t => Uri.parse(t).toString())
         }));
 
-        for(const { session_name } of sessions){
-            if(!session_name) continue;
-            this.createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${session_name}`));
+        for (const { session_name } of sessions) {
+            if (!session_name) continue;
+            this._createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${session_name}`));
         }
 
         const promises = sessions.map(
-            ({session_name, theories}) => theories.map(
+            ({ session_name, theories }) => theories.map(
                 s => this.createFromOriginal(Uri.parse(s), session_name)
             )
         ).reduce((x, y) => x.concat(y), []);
@@ -182,12 +219,12 @@ export class IsabelleFSP implements FileSystemProvider {
         await Promise.all(promises);
     }
 
-    public async createFromOriginal(uri: Uri, sessionName: string): Promise<Uri>{
+    public async createFromOriginal(uri: Uri, sessionName: string): Promise<Uri> {
         const data = await workspace.fs.readFile(uri);
 
         const newUri = Uri.parse(
             IsabelleFSP.scheme + ':' +
-            path.posix.join('/',sessionName, path.basename(uri.fsPath))
+            path.posix.join('/', sessionName, path.basename(uri.fsPath, '.thy'))
         );
         const encodedData = IsabelleFSP.symbolEncoder.encode(data);
 
@@ -196,14 +233,14 @@ export class IsabelleFSP implements FileSystemProvider {
         this.isabelleToFile.set(isabelleFile, discFile);
         this.fileToIsabelle.set(discFile, isabelleFile);
 
-        await this.writeFile(newUri, encodedData, {create: true, overwrite: true});
+        await this.writeFile(newUri, encodedData, { create: true, overwrite: true });
 
         return newUri;
     }
 
     public getTheorySession(uri: string): string {
         const session = this.sessionTheories.find((s) => s.theories.includes(uri));
-        if(!session){
+        if (!session) {
             return 'Draft';
         }
 
@@ -211,17 +248,17 @@ export class IsabelleFSP implements FileSystemProvider {
     }
 
     public async decideToCreate(uri: Uri, languageId: string): Promise<string | undefined> {
-        if(
+        if (
             uri.scheme !== 'file' ||
             languageId !== 'isabelle' ||
             !IsabelleFSP.symbolEncoder
-        ){
+        ) {
             return;
         }
 
         const uriString = uri.toString();
         const isabelleUri = this.fileToIsabelle.get(uriString);
-        if(isabelleUri){
+        if (isabelleUri) {
             return isabelleUri;
         }
 
@@ -231,7 +268,7 @@ export class IsabelleFSP implements FileSystemProvider {
         return createdUri.toString();
     }
 
-    private async syncOriginal(uri: Uri, content: Uint8Array){
+    private async syncOriginal(uri: Uri, content: Uint8Array) {
         const originUri = Uri.parse(this.isabelleToFile.get(uri.toString()));
         const decodedContent = IsabelleFSP.symbolEncoder.decode(content);
         workspace.fs.writeFile(originUri, decodedContent);
@@ -261,7 +298,10 @@ export class IsabelleFSP implements FileSystemProvider {
     }
 
     async writeFile(uri: Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
-        if(!IsabelleFSP.symbolEncoder) return;
+        if (!IsabelleFSP.symbolEncoder) return;
+        if (!this.isabelleToFile.get(uri.toString())) {
+            throw FileSystemError.NoPermissions("No permission to create on Isabelle File System");
+        }
 
         const basename = path.posix.basename(uri.path);
         const parent = this._lookupParentDirectory(uri, true);
@@ -276,8 +316,8 @@ export class IsabelleFSP implements FileSystemProvider {
             throw FileSystemError.FileExists(uri);
         }
 
-        if(entry){
-            if(options.create){
+        if (entry) {
+            if (options.create) {
                 this.syncOriginal(uri, content);
                 return;
             }
@@ -301,28 +341,10 @@ export class IsabelleFSP implements FileSystemProvider {
     // --- manage files/folders
 
     rename(oldUri: Uri, newUri: Uri, options: { overwrite: boolean }): void {
-
-        if (!options.overwrite && this._lookup(newUri, false)) {
-            throw FileSystemError.FileExists(newUri);
-        }
-
-        const entry = this._lookup(oldUri, false);
-        const oldParent = this._lookupParentDirectory(oldUri);
-
-        const newParent = this._lookupParentDirectory(newUri);
-        const newName = path.posix.basename(newUri.path);
-
-        oldParent.entries.delete(entry.name);
-        entry.name = newName;
-        newParent.entries.set(newName, entry);
-
-        this._fireSoon(
-            { type: FileChangeType.Deleted, uri: oldUri },
-            { type: FileChangeType.Created, uri: newUri }
-        );
+        throw FileSystemError.NoPermissions("No permission to rename on Isabelle File System");
     }
 
-    delete(uri: Uri): void {
+    private _delete(uri: Uri): void {
         const dirname = uri.with({ path: path.posix.dirname(uri.path) });
         const basename = path.posix.basename(uri.path);
         const parent = this._lookupAsDirectory(dirname, false);
@@ -338,7 +360,13 @@ export class IsabelleFSP implements FileSystemProvider {
         this._fireSoon({ type: FileChangeType.Changed, uri: dirname }, { uri, type: FileChangeType.Deleted });
     }
 
-    createDirectory(uri: Uri): void {
+    delete(uri: Uri): void {
+        throw FileSystemError.NoPermissions("No permission to delete on Isabelle File System");
+        //In case it needs to be reactivated
+        this._delete(uri);
+    }
+
+    private _createDirectory(uri: Uri): void {
         const basename = path.posix.basename(uri.path);
         const dirname = uri.with({ path: path.posix.dirname(uri.path) });
         const parent = this._lookupAsDirectory(dirname, false);
@@ -348,6 +376,12 @@ export class IsabelleFSP implements FileSystemProvider {
         parent.mtime = Date.now();
         parent.size += 1;
         this._fireSoon({ type: FileChangeType.Changed, uri: dirname }, { type: FileChangeType.Created, uri });
+    }
+
+    createDirectory(uri: Uri): void {
+        throw FileSystemError.NoPermissions("No permission to create on Isabelle File System");
+        //In case it needs to be reactivated
+        this._createDirectory(uri);
     }
 
     // --- lookup
@@ -361,17 +395,17 @@ export class IsabelleFSP implements FileSystemProvider {
             }
             let child: Entry | undefined;
             if (!(entry instanceof Directory))
-                if(!silent)
+                if (!silent)
                     throw FileSystemError.FileNotFound(uri);
                 else
                     return undefined;
 
             child = entry.entries.get(part);
             if (!child) {
-                if(create){
+                if (create) {
                     child = new Directory(part);
                     entry.entries.set(part, child);
-                } else if(!silent)
+                } else if (!silent)
                     throw FileSystemError.FileNotFound(uri);
                 else
                     return undefined;

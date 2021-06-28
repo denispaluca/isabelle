@@ -8,7 +8,7 @@ import * as protocol from './protocol';
 import * as state_panel from './state_panel';
 import * as completion from './completion';
 import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, workspace, window,
-  commands, languages } from 'vscode';
+  commands, languages, ProgressLocation } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient';
 import { registerAbbreviations } from './abbreviations';
 import { IsabelleFSP } from './isabelle_filesystem/isabelleFSP';
@@ -28,8 +28,7 @@ export function activate(context: ExtensionContext)
   if (isabelle_home === "")
     window.showErrorMessage("Missing user settings: isabelle.home")
   else {
-    IsabelleFSP.register(context);
-    const discFolder = workspace.workspaceFolders[1].uri.fsPath;
+    const discFolder = IsabelleFSP.register(context);
     const isabelle_tool = isabelle_home + "/bin/isabelle"
     const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions", 
     '-D', discFolder
@@ -60,6 +59,14 @@ export function activate(context: ExtensionContext)
     const language_client =
       new LanguageClient("Isabelle", server_options, language_client_options, false)
 
+    
+    window.withProgress({location: ProgressLocation.Notification, cancellable: false}, 
+      async (progress) => {
+        progress.report({
+          message: 'Waiting for Isabelle to start...'
+        });
+        return await language_client.onReady();
+    })
 
     /* decorations */
 
@@ -162,6 +169,7 @@ export function activate(context: ExtensionContext)
     {
       language_client.onNotification(protocol.session_theories_type,
         ({entries}) => IsabelleFSP.initWorkspace(entries));
+
       language_client.onNotification(protocol.symbols_type,
         params => {
           registerAbbreviations(params.entries, context);
@@ -171,9 +179,22 @@ export function activate(context: ExtensionContext)
           //after a valid symbol encoder is loaded
           language_client.sendNotification(protocol.session_theories_request_type);
         });
-      language_client.sendNotification(protocol.symbols_request_type)
+
+      language_client.sendNotification(protocol.symbols_request_type);
+
+      //Reset system if changes to ROOT
     })
 
+    const watcher = workspace.createFileSystemWatcher({
+      base: discFolder,
+      pattern: '{ROOT,ROOTS}'
+    }, true, false, true);
+    watcher.onDidChange(() => 
+      language_client.sendNotification(
+        protocol.session_theories_request_type,
+        { reset: true}
+      ));
+    context.subscriptions.push(watcher)
 
     /* completion */
 

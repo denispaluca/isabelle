@@ -635,7 +635,13 @@ object LSP
     }
   }
 
-  object Session_Theories_Request extends Notification0("PIDE/session_theories_request")
+  object Session_Theories_Request {
+    def unapply(json: JSON.T): Option[Boolean] =
+      json match {
+        case Notification("PIDE/session_theories_request", Some(params)) => JSON.bool(params, "reset")
+        case _ => Option(false)
+      }
+  }
 
   object Session_Theories {
     def apply(session_theories: Map[String, List[String]]): JSON.T = {
