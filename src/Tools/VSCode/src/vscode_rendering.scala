@@ -98,7 +98,7 @@ class VSCode_Rendering(snapshot: Document.Snapshot, val model: VSCode_Model)
 
         val syntax = model.syntax()
         val syntax_completion =
-          syntax.complete(history, unicode = true, explicit = true,
+          syntax.complete(history, unicode = true, explicit = false,
             line_start, doc.lines(line).text, caret - line_start,
             language_context(caret_range) getOrElse syntax.language_context)
 
@@ -121,7 +121,7 @@ class VSCode_Rendering(snapshot: Document.Snapshot, val model: VSCode_Model)
               case Some(result) =>
                 result.items.map(item =>
                   LSP.CompletionItem(
-                    label = Some(item.description.mkString(" ")) getOrElse(item.replacement),
+                    label = (Some(item.description.mkString(" ")) getOrElse(item.replacement)) + " " + item.original ,
                     text = Some(item.replacement),
                     range = Some(doc.range(item.range))))
             }

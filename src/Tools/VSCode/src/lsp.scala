@@ -158,7 +158,10 @@ object LSP
     val json: JSON.T =
       JSON.Object(
         "textDocumentSync" -> 2,
-        "completionProvider" -> JSON.Object("resolveProvider" -> false, "triggerCharacters" -> Nil),
+        "completionProvider" -> JSON.Object(
+          "resolveProvider" -> false,
+          "triggerCharacters" -> Symbol.abbrevs.map { _._2.split("") }.flatten.toSet.toList
+        ),
         "hoverProvider" -> true,
         "definitionProvider" -> true,
         "documentHighlightProvider" -> true)

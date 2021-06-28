@@ -53,14 +53,6 @@ export function activate(context: ExtensionContext)
       uriConverters: {
         code2Protocol: uri => IsabelleFSP.getFileUri(uri.toString()),
         protocol2Code: value => Uri.parse(IsabelleFSP.getIsabelleUri(value))
-      },
-      middleware: {
-        provideCompletionItem: async (document, 
-          position, context, 
-          token, next) => {
-          const nxt = await next(document, position, context, token);
-          return nxt;
-        }
       }
     };
 
