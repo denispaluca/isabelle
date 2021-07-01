@@ -68,8 +68,8 @@ class Panel
 
   private _getHtmlForWebview(content: string, auto_update: boolean): string {
     const webview = this.webview_panel.webview;
-		const scriptUri = webview.asWebviewUri(Uri.file(path.join(this._extensionPath, 'src/media', 'main.js')));
-		const styleVSCodeUri = webview.asWebviewUri(Uri.file(path.join(this._extensionPath, 'src/media', 'vscode.css')));
+		const scriptUri = webview.asWebviewUri(Uri.file(path.join(this._extensionPath, 'media', 'main.js')));
+		const styleVSCodeUri = webview.asWebviewUri(Uri.file(path.join(this._extensionPath, 'media', 'vscode.css')));
     const checked = auto_update ? 'checked' : ''
 		return `<!DOCTYPE html>
 			<html>
