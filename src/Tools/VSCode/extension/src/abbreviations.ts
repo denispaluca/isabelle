@@ -1,16 +1,23 @@
 import { ExtensionContext, Range, TextDocumentContentChangeEvent, workspace, WorkspaceEdit } from "vscode";
 import { PrefixTree } from "./isabelle_filesystem/prefix_tree";
 import { SymbolEntry } from "./isabelle_filesystem/symbol_encoder";
+import { get_replacement_mode } from "./library";
 
 const entries: Record<string, string> = {};
 const prefixTree: PrefixTree = new PrefixTree();
 
 function registerAbbreviations(data: SymbolEntry[], context: ExtensionContext){
     const [minLength, maxLength] = setAbbrevs(data);
+    const regEx = /[^A-Za-z0-9 ]/;
     context.subscriptions.push(
         workspace.onDidChangeTextDocument(e => {
             const doc = e.document;
-            if(doc.languageId !== 'isabelle' || doc.uri.scheme !== 'isabelle'){
+            const mode = get_replacement_mode();
+            if(
+                mode == 'none' ||
+                doc.languageId !== 'isabelle' || 
+                doc.uri.scheme !== 'isabelle'
+            ){
                 return;
             }
             const edits = new WorkspaceEdit();
@@ -43,7 +50,11 @@ function registerAbbreviations(data: SymbolEntry[], context: ExtensionContext){
                     continue;
                 }
 
-                const word = node.getWord();
+                const word = node.getWord().join('');
+                if(mode == 'non-alpha' && !regEx.test(word)){
+                    continue;
+                }
+
                 beginPos = doc.positionAt(endOffset - word.length);
                 range = new Range(beginPos, endPos);
 
