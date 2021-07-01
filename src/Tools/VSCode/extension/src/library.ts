@@ -48,10 +48,15 @@ export function get_configuration<T>(name: string): T
   return workspace.getConfiguration("isabelle").get<T>(name)
 }
 
+export function get_replacement_mode() {
+  return get_configuration<'none' | 'non-alpha' | 'all'>('replacement');
+}
+
 export function get_color(color: string, light: boolean): string
 {
-  const config = color + (light ? "_light" : "_dark") + "_color"
-  return get_configuration<string>(config)
+  const colors = get_configuration<object>("textColor");
+  const conf = colors[color + (light ? "_light" : "_dark")];
+  return conf;
 }
 
 

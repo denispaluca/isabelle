@@ -98,13 +98,13 @@ class VSCode_Rendering(snapshot: Document.Snapshot, val model: VSCode_Model)
 
         val syntax = model.syntax()
         val syntax_completion =
-          syntax.complete(history, unicode = false, explicit = true,
+          syntax.complete(history, unicode = true, explicit = false,
             line_start, doc.lines(line).text, caret - line_start,
             language_context(caret_range) getOrElse syntax.language_context)
 
         val (no_completion, semantic_completion) =
           rendering.semantic_completion_result(
-            history, false, syntax_completion.map(_.range), caret_range)
+            history, true, syntax_completion.map(_.range), caret_range)
 
         if (no_completion) Nil
         else {
@@ -121,8 +121,8 @@ class VSCode_Rendering(snapshot: Document.Snapshot, val model: VSCode_Model)
               case Some(result) =>
                 result.items.map(item =>
                   LSP.CompletionItem(
-                    label = item.replacement,
-                    detail = Some(item.description.mkString(" ")),
+                    label = (Some(item.description.mkString(" ")) getOrElse(item.replacement)) + " " + item.original ,
+                    text = Some(item.replacement),
                     range = Some(doc.range(item.range))))
             }
           items ::: VSCode_Spell_Checker.menu_items(rendering, caret)

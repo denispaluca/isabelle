@@ -10,6 +10,7 @@ import * as completion from './completion';
 import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, workspace, window,
   commands, languages, ProgressLocation } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient';
+import { registerAbbreviations } from './abbreviations';
 import { IsabelleFSP } from './isabelle_filesystem/isabelleFSP';
 
 
@@ -171,6 +172,7 @@ export function activate(context: ExtensionContext)
 
       language_client.onNotification(protocol.symbols_type,
         params => {
+          registerAbbreviations(params.entries, context);
           IsabelleFSP.updateSymbolEncoder(params.entries);
 
           //request theories to load in isabelle file system 
