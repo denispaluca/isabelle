@@ -1,14 +1,14 @@
 class TreeNode {
-    public key: number;
+    public key: number | string;
     public parent: TreeNode = null;
     public end: boolean = false;
-    public value: number[];
-    public children: Record<number, TreeNode> = {};
-    constructor(key: number){
+    public value: number[] | string;
+    public children: Record<number | string, TreeNode> = {};
+    constructor(key: number | string){
         this.key = key;
     }
 
-    public getWord(): number[] {
+    public getWord(): number[] | string[] {
         let output = [];
         let node: TreeNode = this;
         
@@ -28,7 +28,7 @@ class PrefixTree {
         this.root = new TreeNode(null);
     }
 
-    public insert(word: number[], value: number[]){
+    public insert(word: number[] | string, value: number[] | string){
         let node = this.root;
         for(var i = 0; i < word.length; i++) {
             if (!node.children[word[i]]) {
@@ -38,7 +38,8 @@ class PrefixTree {
             }
             
             node = node.children[word[i]];
-            
+            node.end = false;
+
             if (i == word.length-1) {
                 node.end = true;
                 node.value = value;
@@ -46,20 +47,7 @@ class PrefixTree {
         }
     }
 
-    public check(prefix: number[]): boolean {
-        return !!this.getNode(prefix);
-    }
-
-    public contains(word: number[]): boolean {
-        let node = this.getNode(word);
-        if(!node){
-            return false;
-        }
-
-        return node.end;
-    }
-
-    public getNode(prefix: number[]): TreeNode | undefined {
+    public getNode(prefix: number[] | string): TreeNode | undefined {
         let node = this.root;
         
         for(let i = 0; i < prefix.length; i++) {
@@ -71,28 +59,23 @@ class PrefixTree {
         return node;
     }
 
-    public find(prefix: number[]): number[][] {
+    public getEndOrValue(prefix: number[] | string): TreeNode | undefined {
         let node = this.root;
-        let output: number[][] = [];
-        
-        node = this.getNode(prefix);
-        if(!node){
-            return output;
+        let resNode: TreeNode;
+        for(let i = 0; i < prefix.length; i++) {
+          if (!node.children[prefix[i]]) {
+            return resNode;
+          }
+          node = node.children[prefix[i]];
+          if(node.value){
+            resNode = node;
+          }
+
+          if(node.end){
+            return node;
+          }
         }
-        
-        this.findAllWords(node, output);
-        
-        return output;
-    };
-      
-    private findAllWords(node: TreeNode, arr: number[][]) {
-        if (node.end) {
-          arr.unshift(node.getWord());
-        }
-        
-        for (let child in node.children) {
-          this.findAllWords(node.children[child], arr);
-        }
+        return node;
     }
 }
 

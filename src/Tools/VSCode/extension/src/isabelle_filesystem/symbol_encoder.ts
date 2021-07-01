@@ -74,7 +74,7 @@ export class SymbolEncoder {
             }
             
             if(node && node.end){
-                result.push(...node.value);
+                result.push(...(node.value as number[]));
                 i += word.length - 1;
                 continue;
             }

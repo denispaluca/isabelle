@@ -215,6 +215,7 @@ object LSP
     def unapply(json: JSON.T): Option[Line.Node_Range] =
       for {
         uri <- JSON.string(json, "uri")
+        if Url.is_wellformed_file(uri)
         range_json <- JSON.value(json, "range")
         range <- Range.unapply(range_json)
       } yield Line.Node_Range(Url.absolute_file_name(uri), range)
@@ -226,6 +227,7 @@ object LSP
       for {
         doc <- JSON.value(json, "textDocument")
         uri <- JSON.string(doc, "uri")
+        if Url.is_wellformed_file(uri)
         pos_json <- JSON.value(json, "position")
         pos <- Position.unapply(pos_json)
       } yield Line.Node_Position(Url.absolute_file_name(uri), pos)
@@ -287,6 +289,7 @@ object LSP
           for {
             doc <- JSON.value(params, "textDocument")
             uri <- JSON.string(doc, "uri")
+            if Url.is_wellformed_file(uri)
             lang <- JSON.string(doc, "languageId")
             version <- JSON.long(doc, "version")
             text <- JSON.string(doc, "text")
@@ -310,6 +313,7 @@ object LSP
           for {
             doc <- JSON.value(params, "textDocument")
             uri <- JSON.string(doc, "uri")
+            if Url.is_wellformed_file(uri)
             version <- JSON.long(doc, "version")
             changes <- JSON.list(params, "contentChanges", unapply_change _)
           } yield (Url.absolute_file(uri), version, changes)
@@ -325,6 +329,7 @@ object LSP
           for {
             doc <- JSON.value(params, "textDocument")
             uri <- JSON.string(doc, "uri")
+            if Url.is_wellformed_file(uri)
           } yield Url.absolute_file(uri)
         case _ => None
       }

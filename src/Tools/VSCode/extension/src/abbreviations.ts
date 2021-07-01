@@ -1,14 +1,16 @@
 import { ExtensionContext, Range, TextDocumentContentChangeEvent, workspace, WorkspaceEdit } from "vscode";
+import { PrefixTree } from "./isabelle_filesystem/prefix_tree";
 import { SymbolEntry } from "./isabelle_filesystem/symbol_encoder";
 
 const entries: Record<string, string> = {};
+const prefixTree: PrefixTree = new PrefixTree();
 
 function registerAbbreviations(data: SymbolEntry[], context: ExtensionContext){
-    setAbbrevs(data);
+    const [minLength, maxLength] = setAbbrevs(data);
     context.subscriptions.push(
         workspace.onDidChangeTextDocument(e => {
             const doc = e.document;
-            if(doc.languageId !== 'isabelle'){
+            if(doc.languageId !== 'isabelle' || doc.uri.scheme !== 'isabelle'){
                 return;
             }
             const edits = new WorkspaceEdit();
@@ -24,27 +26,28 @@ function registerAbbreviations(data: SymbolEntry[], context: ExtensionContext){
                 
                 const endOffset = c.rangeOffset + c.text.length + 
                     changes.reduce((a,b) => a + b.text.length, 0);
+                
+                if(endOffset < minLength){
+                    continue;
+                }
+
+                const beginOffset = endOffset < maxLength ? 0 : endOffset - maxLength;
 
                 const endPos = doc.positionAt(endOffset);
+                let beginPos = doc.positionAt(beginOffset);
+                let range = new Range(beginPos, endPos);
+                const text = reverseString(doc.getText(range));
+                
+                const node = prefixTree.getEndOrValue(text);
+                if(!node || !node.value){
+                    continue;
+                }
 
-                let longestMatch: string;
-                let range: Range;
-                for(const key in entries){
-                    const beginOffset = endOffset - key.length;
-                    if(beginOffset < 0 || 
-                        (longestMatch && longestMatch.length >= key.length)) {
-                        continue;
-                    }
+                const word = node.getWord();
+                beginPos = doc.positionAt(endOffset - word.length);
+                range = new Range(beginPos, endPos);
 
-                    const beginPos = doc.positionAt(beginOffset);
-                    const tempRange = new Range(beginPos, endPos);
-                    const compText = doc.getText(tempRange);
-                    if(compText === key){
-                        longestMatch = compText;
-                        range = tempRange;
-                    }
-                }    
-                edits.replace(doc.uri, range, entries[longestMatch]);
+                edits.replace(doc.uri, range, node.value as string);
             }
 
             applyEdits(edits);
@@ -58,25 +61,41 @@ async function applyEdits(edit: WorkspaceEdit){
     await workspace.applyEdit(edit);
 }
 
-function setAbbrevs(data: SymbolEntry[]){
-    const customAbbrevs = new Set<string>();
+function getUniqueAbbrevs(data: SymbolEntry[]): Set<string>{
+    const unique = new Set<string>();
+    const nonUnique = new Set<string>();
     for(const {symbol, code, abbrevs} of data){
-        entries[symbol] = String.fromCharCode(code);
         for(const abbrev of abbrevs){
+            if(abbrev.length == 1 || nonUnique.has(abbrev)){
+                continue;
+            }
+
+            if(unique.has(abbrev)){
+                nonUnique.add(abbrev);
+                unique.delete(abbrev);
+                entries[abbrev] = undefined;
+                continue;
+            }
+
+
             entries[abbrev] = String.fromCharCode(code);
-            customAbbrevs.add(abbrev);
+            unique.add(abbrev);
         }
     }
+    return unique;
+}
 
-    //Add white space to abbrevs which are shorter versions 
-    //of longer abbrevs
-    for(const a1 of customAbbrevs.values()){
-        for(const a2 of customAbbrevs.values()){
+function setAbbrevs(data: SymbolEntry[]): [number, number]{
+    const unique = getUniqueAbbrevs(data);
+
+    //Add white space to abbrevs which are prefix of other abbrevs
+    for(const a1 of unique){
+        for(const a2 of unique){
             if(a1 == a2){
                 continue;
             }
 
-            if(a2.includes(a1)){
+            if(a2.startsWith(a1)){
                 const val = entries[a1];
                 delete entries[a1];
                 entries[a1 + ' '] = val;
@@ -84,6 +103,25 @@ function setAbbrevs(data: SymbolEntry[]){
             }
         }
     }
+
+    let minLength: number;
+    let maxLength: number;
+    for(const entry in entries){
+        if(!minLength || minLength > entry.length)
+            minLength = entry.length;
+        
+        if(!maxLength || maxLength< entry.length)
+            maxLength = entry.length;
+        
+        //add reverse because we check the abbrevs from the end
+        prefixTree.insert(reverseString(entry), entries[entry]);
+    }
+
+    return [minLength, maxLength];
+}
+
+function reverseString(str: string): string {
+    return str.split('').reverse().join('');
 }
 
 function hasNewline(text: string){

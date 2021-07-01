@@ -172,7 +172,7 @@ export function activate(context: ExtensionContext)
 
       language_client.onNotification(protocol.symbols_type,
         params => {
-          //registerAbbreviations(params.entries, context);
+          registerAbbreviations(params.entries, context);
           IsabelleFSP.updateSymbolEncoder(params.entries);
 
           //request theories to load in isabelle file system 
