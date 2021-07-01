@@ -647,7 +647,8 @@ object LSP
     def unapply(json: JSON.T): Option[Boolean] =
       json match {
         case Notification("PIDE/session_theories_request", Some(params)) => JSON.bool(params, "reset")
-        case _ => Option(false)
+        case Notification("PIDE/session_theories_request", None) => Option(false)
+        case _ => None
       }
   }
 
