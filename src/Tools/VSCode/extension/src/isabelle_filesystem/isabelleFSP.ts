@@ -72,7 +72,10 @@ export class IsabelleFSP implements FileSystemProvider {
                 this.instance.decideToCreate(d.uri, d.languageId);
             }),
 
-            window.onDidChangeActiveTextEditor(async ({ document }) => {
+            window.onDidChangeActiveTextEditor(async editor => {
+                if(!editor) return;
+
+                const document = editor.document;
                 const newUri = await this.instance.decideToCreate(document.uri, document.languageId);
 
                 if (!newUri) return;
