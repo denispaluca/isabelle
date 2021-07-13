@@ -9,6 +9,7 @@ class OutPutViewProvider implements WebviewViewProvider {
 	public static readonly viewType = 'isabelle-output';
 
 	private _view?: WebviewView;
+	private content: string = '';
 
 	constructor(
 		private readonly _extensionUri: Uri,
@@ -30,10 +31,14 @@ class OutPutViewProvider implements WebviewViewProvider {
 			]
 		};
 
-		webviewView.webview.html = '';
+		webviewView.webview.html = this.content;
 	}
 
 	public updateContent(content: string){
+		if(!this._view){
+			this.content = content;
+		}
+		
 		this._view.webview.html = this._getHtmlForWebview(content);
 	}
 
