@@ -12,6 +12,7 @@ import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, wor
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient';
 import { registerAbbreviations } from './abbreviations';
 import { IsabelleFSP } from './isabelle_filesystem/isabelleFSP';
+import { OutPutViewProvider } from './output_view';
 
 
 let last_caret_update: protocol.Caret_Update = {}
@@ -133,16 +134,22 @@ export function activate(context: ExtensionContext)
 
 
     /* dynamic output */
-
-    const dynamic_output = window.createOutputChannel("Isabelle Output")
-    context.subscriptions.push(dynamic_output)
-    dynamic_output.show(true)
-    dynamic_output.hide()
+    const provider = new OutPutViewProvider(context.extensionUri);
+    context.subscriptions.push(
+      window.registerWebviewViewProvider(OutPutViewProvider.viewType, provider));
+    // const dynamic_output = window.createOutputChannel("Isabelle Output")
+    // context.subscriptions.push(dynamic_output)
+    // dynamic_output.show(true)
+    // dynamic_output.hide()
 
     language_client.onReady().then(() =>
     {
       language_client.onNotification(protocol.dynamic_output_type,
-        params => { dynamic_output.clear(); dynamic_output.appendLine(params.content) })
+        params => { 
+          provider.updateHtml(params.content);
+          // dynamic_output.clear(); 
+          // dynamic_output.appendLine(params.content) 
+        })
     })
 
 
