@@ -35,9 +35,27 @@ object Dynamic_Output
             else this
         }
       if (st1.output != output) {
+        val elements3: Presentation.Elements =
+          Presentation.Elements(
+            html = Presentation.elements2.html,
+            language = Presentation.elements2.language,
+            entity = Markup.Elements.full)
+
+        def entity_link(props: Properties.T, body: XML.Body): Option[XML.Tree] =
+          (props, props) match {
+            case (Position.Def_File(thy_file), Position.Def_Line(def_line)) =>
+              val fileMaybe = resources.source_file(thy_file)
+              fileMaybe match {
+                  case Some(file) =>
+                    //val file = resources.node_file(value)
+                    Some(HTML.link(File.absolute(File.platform_file(Path.explode(file))).toURI.toString + "#" + def_line, body))
+                  case _ => None
+              }
+            case _ => None
+          }
         val htmlBody = Presentation.make_html(
-          Presentation.elements2,
-          (_, _) => None,
+          elements3,
+          entity_link,
           Pretty.separate(st1.output))
 
         channel.write(LSP.Dynamic_Output(HTML.source(htmlBody).toString()))

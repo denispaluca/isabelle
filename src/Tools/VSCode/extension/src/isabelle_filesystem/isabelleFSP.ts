@@ -79,15 +79,6 @@ export class IsabelleFSP implements FileSystemProvider {
                 const newUri = await this.instance.decideToCreate(document.uri, document.languageId);
 
                 if (!newUri) return;
-
-                const openEditors = window
-                    .visibleTextEditors
-                    .filter(e => e.document.uri.toString() === newUri)
-                    .length;
-
-                if(openEditors === 0){
-                    return;
-                }
                 
                 const answer = await window.showInformationMessage(
                     'Would you like to open the Isabelle theory associated with this file?',
@@ -255,6 +246,9 @@ export class IsabelleFSP implements FileSystemProvider {
     public getTheorySession(uri: string): string {
         const session = this.sessionTheories.find((s) => s.theories.includes(uri));
         if (!session) {
+            if(!this.root.entries.get('Draft')){
+                this._createDirectory(Uri.parse(IsabelleFSP.scheme + ':/Draft'))
+            }
             return 'Draft';
         }
 
@@ -318,7 +312,7 @@ export class IsabelleFSP implements FileSystemProvider {
         }
 
         const basename = path.posix.basename(uri.path);
-        const parent = this._lookupParentDirectory(uri, true);
+        const parent = this._lookupParentDirectory(uri);
         let entry = parent.entries.get(basename);
         if (entry instanceof Directory) {
             throw FileSystemError.FileIsADirectory(uri);
@@ -400,7 +394,9 @@ export class IsabelleFSP implements FileSystemProvider {
 
     // --- lookup
 
-    private _lookup(uri: Uri, silent: boolean, create?: boolean): Entry | undefined {
+    private _lookup(uri: Uri, silent: false): Entry;
+    private _lookup(uri: Uri, silent: boolean): Entry | undefined;
+    private _lookup(uri: Uri, silent: boolean): Entry | undefined {
         const parts = uri.path.split('/');
         let entry: Entry = this.root;
         for (const part of parts) {
@@ -408,29 +404,23 @@ export class IsabelleFSP implements FileSystemProvider {
                 continue;
             }
             let child: Entry | undefined;
-            if (!(entry instanceof Directory))
-                if (!silent)
-                    throw FileSystemError.FileNotFound(uri);
-                else
-                    return undefined;
-
-            child = entry.entries.get(part);
+            if (entry instanceof Directory) {
+                child = entry.entries.get(part);
+            }
             if (!child) {
-                if (create) {
-                    child = new Directory(part);
-                    entry.entries.set(part, child);
-                } else if (!silent)
+                if (!silent) {
                     throw FileSystemError.FileNotFound(uri);
-                else
+                } else {
                     return undefined;
+                }
             }
             entry = child;
         }
         return entry;
     }
 
-    private _lookupAsDirectory(uri: Uri, silent: boolean, create?: boolean): Directory {
-        const entry = this._lookup(uri, silent, create);
+    private _lookupAsDirectory(uri: Uri, silent: boolean): Directory {
+        const entry = this._lookup(uri, silent);
         if (entry instanceof Directory) {
             return entry;
         }
@@ -445,9 +435,9 @@ export class IsabelleFSP implements FileSystemProvider {
         throw FileSystemError.FileIsADirectory(uri);
     }
 
-    private _lookupParentDirectory(uri: Uri, create?: boolean): Directory {
+    private _lookupParentDirectory(uri: Uri): Directory {
         const dirname = uri.with({ path: path.posix.dirname(uri.path) });
-        return this._lookupAsDirectory(dirname, false, create);
+        return this._lookupAsDirectory(dirname, false);
     }
 
     // --- manage file events

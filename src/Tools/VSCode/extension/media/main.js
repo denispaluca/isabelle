@@ -14,5 +14,14 @@
     document.getElementById('locate_button')
         .addEventListener('click', (e) => {
             vscode.postMessage({'command': 'locate'});
-        })
+        });
+    
+    for (const link of document.querySelectorAll('a')) {
+        link.addEventListener('click', () => {
+            vscode.postMessage({
+                command: "open",
+                link: link.getAttribute('href'),
+            });
+        });
+    }
 }());

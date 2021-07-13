@@ -1,8 +1,9 @@
 import { WebviewViewProvider, WebviewView, Uri, WebviewViewResolveContext,
-	 CancellationToken } from "vscode";
+	 CancellationToken, Range, TextEditorRevealType, window, Position, Selection} from "vscode";
 import { text_colors } from "./decorations";
 import * as library from "./library";
 import * as path from 'path';
+import { IsabelleFSP } from "./isabelle_filesystem/isabelleFSP";
 
 class OutPutViewProvider implements WebviewViewProvider {
 
@@ -32,6 +33,19 @@ class OutPutViewProvider implements WebviewViewProvider {
 		};
 
 		webviewView.webview.html = this.content;
+		webviewView.webview.onDidReceiveMessage(async message => {
+			if (message.command === "open") {
+				const uri = Uri.parse(message.link);
+				const line = Number(uri.fragment) || 0;
+				const pos = new Position(line, 0);
+				const uriNoFragment = uri.with({ fragment: '' }).toString();
+				const isabelleUri = IsabelleFSP.getIsabelleUri(uriNoFragment);
+				window.showTextDocument(Uri.parse(isabelleUri), {
+					preserveFocus: false,
+					selection: new Selection(pos,pos)
+				});
+			}
+		});
 	}
 
 	public updateContent(content: string){
@@ -44,6 +58,7 @@ class OutPutViewProvider implements WebviewViewProvider {
 
 	private _getHtmlForWebview(content: string): string {
 		const webview = this._view.webview;
+		const scriptUri = webview.asWebviewUri(Uri.file(path.join(this._extensionUri.fsPath, 'media', 'output.js')));
 		const styleVSCodeUri = webview.asWebviewUri(Uri.file(path.join(this._extensionUri.fsPath, 'media', 'vscode.css')));
 		return `<!DOCTYPE html>
 			<html>
@@ -58,6 +73,7 @@ class OutPutViewProvider implements WebviewViewProvider {
 				</head>
 				<body>
 					${content}
+					<script src="${scriptUri}"></script>
 				</body>
 			</html>`;
 	}
