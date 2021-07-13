@@ -80,6 +80,15 @@ export class IsabelleFSP implements FileSystemProvider {
 
                 if (!newUri) return;
 
+                const openEditors = window
+                    .visibleTextEditors
+                    .filter(e => e.document.uri.toString() === newUri)
+                    .length;
+
+                if(openEditors === 0){
+                    return;
+                }
+                
                 const answer = await window.showInformationMessage(
                     'Would you like to open the Isabelle theory associated with this file?',
                     'Yes',
