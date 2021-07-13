@@ -158,7 +158,9 @@ export class IsabelleFSP implements FileSystemProvider {
     }
 
     private async prepareTheory(doc: TextDocument) {
-        languages.setTextDocumentLanguage(doc, 'isabelle');
+        if(doc.languageId !== 'isabelle')
+            languages.setTextDocumentLanguage(doc, 'isabelle');
+        
         const uriString = doc.uri.toString();
         const file = this.isabelleToFile.get(uriString);
         if (!file) {
