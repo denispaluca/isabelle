@@ -1,12 +1,11 @@
-import { DecorationRangeBehavior, DecorationRenderOptions, ExtensionContext, Range, TextEditorDecorationType, window, workspace } from "vscode";
+import { DecorationRangeBehavior, ExtensionContext, Range, 
+    TextDocument, TextEditor, window, workspace } from "vscode";
  
+const noHideList = [' ', '\n', '\r', '⇩', '⇧'];
 function indicesOf(char: string, text: string): number[]{
     let indices: number[] = [];
     for(let i = 0; i < text.length - 1; i++) {
-        if (text[i] === char && 
-            text[i + 1] !== ' ' && 
-            text[i + 1] !== char) {
-            
+        if (text[i] === char && !noHideList.includes(text[i + 1])) {
             indices.push(i);
         }
     }
@@ -30,35 +29,55 @@ export function registerScriptDecorations(context: ExtensionContext){
         textDecoration: 'none; position: relative; bottom: -0.5em; font-size: 80%'
     });
 
+    const setEditorDecs = (editor: TextEditor, doc: TextDocument) => {
+        const { hideRanges, superscriptRanges, subscriptRanges } = extractRanges(doc);
+
+        editor.setDecorations(hide, hideRanges);
+        editor.setDecorations(superscript, superscriptRanges);
+        editor.setDecorations(subscript, subscriptRanges);
+    }
+
     context.subscriptions.push(
         hide, superscript, subscript,
+
         window.onDidChangeActiveTextEditor(editor => {
+            if(!editor){
+                return;
+            }
+
             const doc = editor.document;
-            const text = doc.getText();
-            const superscriptIndices = indicesOf('⇧', text);
-            const subscriptIndices = indicesOf('⇩', text);
-
-            const hideRanges: Range[] = [];
-            const superscriptRanges: Range[] = [];
-            const subscriptRanges: Range[] = [];
-
-            for(const index of superscriptIndices){
-                const posMid = doc.positionAt(index + 1);
-                hideRanges.push(new Range(doc.positionAt(index), posMid));
-                superscriptRanges.push(new Range(posMid, doc.positionAt(index + 2)));
+            setEditorDecs(editor, doc);
+        }),
+        
+        workspace.onDidChangeTextDocument(({document}) => {
+            for(const editor of window.visibleTextEditors){
+                if(editor.document.uri.toString() === document.uri.toString()){
+                    setEditorDecs(editor, document);
+                }
             }
-
-            for(const index of subscriptIndices){
-                const posMid = doc.positionAt(index + 1);
-                hideRanges.push(new Range(doc.positionAt(index), posMid));
-                subscriptRanges.push(new Range(posMid, doc.positionAt(index + 2)));
-            }
-
-            editor.setDecorations(hide, hideRanges);
-            editor.setDecorations(superscript, superscriptRanges);
-            editor.setDecorations(subscript, subscriptRanges);
-        })    
+        })
     );
+}
 
-    
+function extractRanges(doc: TextDocument) {
+    const text = doc.getText();
+    const superscriptIndices = indicesOf('⇧', text);
+    const subscriptIndices = indicesOf('⇩', text);
+
+    const hideRanges: Range[] = [];
+    const superscriptRanges: Range[] = [];
+    const subscriptRanges: Range[] = [];
+
+    for (const index of superscriptIndices) {
+        const posMid = doc.positionAt(index + 1);
+        hideRanges.push(new Range(doc.positionAt(index), posMid));
+        superscriptRanges.push(new Range(posMid, doc.positionAt(index + 2)));
+    }
+
+    for (const index of subscriptIndices) {
+        const posMid = doc.positionAt(index + 1);
+        hideRanges.push(new Range(doc.positionAt(index), posMid));
+        subscriptRanges.push(new Range(posMid, doc.positionAt(index + 2)));
+    }
+    return { hideRanges, superscriptRanges, subscriptRanges };
 }
