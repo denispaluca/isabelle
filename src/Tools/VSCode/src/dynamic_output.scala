@@ -35,8 +35,12 @@ object Dynamic_Output
             else this
         }
       if (st1.output != output) {
-        channel.write(LSP.Dynamic_Output(
-          resources.output_pretty_message(Pretty.separate(st1.output))))
+        val htmlBody = Presentation.make_html(
+          Presentation.elements2,
+          (_, _) => None,
+          Pretty.separate(st1.output))
+
+        channel.write(LSP.Dynamic_Output(HTML.source(htmlBody).toString()))
       }
       st1
     }

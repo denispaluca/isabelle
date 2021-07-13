@@ -146,7 +146,7 @@ export function activate(context: ExtensionContext)
     {
       language_client.onNotification(protocol.dynamic_output_type,
         params => { 
-          provider.updateHtml(params.content);
+          provider.updateContent(params.content);
           // dynamic_output.clear(); 
           // dynamic_output.appendLine(params.content) 
         })

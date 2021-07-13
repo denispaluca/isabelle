@@ -1,5 +1,8 @@
 import { WebviewViewProvider, WebviewView, Uri, WebviewViewResolveContext,
 	 CancellationToken } from "vscode";
+import { text_colors } from "./decorations";
+import * as library from "./library";
+import * as path from 'path';
 
 class OutPutViewProvider implements WebviewViewProvider {
 
@@ -30,8 +33,38 @@ class OutPutViewProvider implements WebviewViewProvider {
 		webviewView.webview.html = '';
 	}
 
-	public updateHtml(html: string){
-		this._view.webview.html = html;
+	public updateContent(content: string){
+		this._view.webview.html = this._getHtmlForWebview(content);
+	}
+
+	private _getHtmlForWebview(content: string): string {
+		const webview = this._view.webview;
+		const styleVSCodeUri = webview.asWebviewUri(Uri.file(path.join(this._extensionUri.fsPath, 'media', 'vscode.css')));
+		return `<!DOCTYPE html>
+			<html>
+				<head>
+					<meta charset="UTF-8">
+					<meta name="viewport" content="width=device-width, initial-scale=1.0">
+					<link href="${styleVSCodeUri}" rel="stylesheet" type="text/css">
+					<style>
+					${this._getDecorations()}
+					</style>
+					<title>Output</title>
+				</head>
+				<body>
+					${content}
+				</body>
+			</html>`;
+	}
+  
+	private _getDecorations(): string{
+	  let style: string = '';
+	  for(const key of text_colors){
+		style += `body.vscode-light .${key} { color: ${library.get_color(key, true)} }\n`;
+		style += `body.vscode-dark .${key} { color: ${library.get_color(key, false)} }\n`;
+	  }
+  
+	  return style;
 	}
 }
 
