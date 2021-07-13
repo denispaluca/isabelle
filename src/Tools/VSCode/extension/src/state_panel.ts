@@ -6,6 +6,7 @@ import * as path from 'path';
 import { LanguageClient } from 'vscode-languageclient';
 import { Uri, ExtensionContext, window, WebviewPanel, ViewColumn, Webview } from 'vscode'
 import { text_colors } from './decorations';
+import { getHtmlForWebview } from './output_view';
 
 
 let language_client: LanguageClient
@@ -27,7 +28,7 @@ class Panel
   public set_content(state: protocol.State_Output)
   {
     this.state_id = state.id
-    this.webview_panel.webview.html = this._getHtmlForWebview(state.content, state.auto_update);
+    this.webview_panel.webview.html = this._getHtml(state.content, state.auto_update);
   }
 
   public reveal()
@@ -66,44 +67,19 @@ class Panel
       })
   }
 
-  private _getHtmlForWebview(content: string, auto_update: boolean): string {
+  private _getHtml(content: string, auto_update: boolean): string {
     const webview = this.webview_panel.webview;
-		const scriptUri = webview.asWebviewUri(Uri.file(path.join(this._extensionPath, 'media', 'main.js')));
-		const styleVSCodeUri = webview.asWebviewUri(Uri.file(path.join(this._extensionPath, 'media', 'vscode.css')));
     const checked = auto_update ? 'checked' : ''
-		return `<!DOCTYPE html>
-			<html>
-			<head>
-				<meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link href="${styleVSCodeUri}" rel="stylesheet" type="text/css">
-        <style>
-          ${this._getDecorations()}
-        </style>
-				<title>State Panel</title>
-			</head>
-			<body>
-        <div id="controls">
-          <input type="checkbox" id="auto_update" ${checked}/>
-          <label for="auto_update">Auto update</label>
-          <button id="update_button">Update</button>
-          <button id="locate_button">Locate</button>
-        </div>
-        ${content}
-				<script src="${scriptUri}"></script>
-			</body>
-			</html>`;
+		const contentWithButtons = `<div id="controls">
+      <input type="checkbox" id="auto_update" ${checked}/>
+      <label for="auto_update">Auto update</label>
+      <button id="update_button">Update</button>
+      <button id="locate_button">Locate</button>
+    </div>
+    ${content}`;
+
+    return getHtmlForWebview(contentWithButtons, webview, this._extensionPath);
 	}
-
-  private _getDecorations(): string{
-    let style: string = '';
-    for(const key of text_colors){
-      style += `body.vscode-light .${key} { color: ${library.get_color(key, true)} }\n`;
-      style += `body.vscode-dark .${key} { color: ${library.get_color(key, false)} }\n`;
-    }
-
-    return style;
-  }
 }
 
 let panel: Panel

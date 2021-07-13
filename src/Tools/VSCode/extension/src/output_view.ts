@@ -1,5 +1,5 @@
 import { WebviewViewProvider, WebviewView, Uri, WebviewViewResolveContext,
-	 CancellationToken, Range, TextEditorRevealType, window, Position, Selection} from "vscode";
+	 CancellationToken, window, Position, Selection, Webview} from "vscode";
 import { text_colors } from "./decorations";
 import * as library from "./library";
 import * as path from 'path';
@@ -32,7 +32,7 @@ class OutPutViewProvider implements WebviewViewProvider {
 			]
 		};
 
-		webviewView.webview.html = this.content;
+		webviewView.webview.html = this._getHtml(this.content);
 		webviewView.webview.onDidReceiveMessage(async message => {
 			if (message.command === "open") {
 				const uri = Uri.parse(message.link);
@@ -51,42 +51,46 @@ class OutPutViewProvider implements WebviewViewProvider {
 	public updateContent(content: string){
 		if(!this._view){
 			this.content = content;
+			return;
 		}
 		
-		this._view.webview.html = this._getHtmlForWebview(content);
+		this._view.webview.html = this._getHtml(content);
 	}
 
-	private _getHtmlForWebview(content: string): string {
-		const webview = this._view.webview;
-		const scriptUri = webview.asWebviewUri(Uri.file(path.join(this._extensionUri.fsPath, 'media', 'output.js')));
-		const styleVSCodeUri = webview.asWebviewUri(Uri.file(path.join(this._extensionUri.fsPath, 'media', 'vscode.css')));
-		return `<!DOCTYPE html>
-			<html>
-				<head>
-					<meta charset="UTF-8">
-					<meta name="viewport" content="width=device-width, initial-scale=1.0">
-					<link href="${styleVSCodeUri}" rel="stylesheet" type="text/css">
-					<style>
-					${this._getDecorations()}
-					</style>
-					<title>Output</title>
-				</head>
-				<body>
-					${content}
-					<script src="${scriptUri}"></script>
-				</body>
-			</html>`;
-	}
-  
-	private _getDecorations(): string{
-	  let style: string = '';
-	  for(const key of text_colors){
-		style += `body.vscode-light .${key} { color: ${library.get_color(key, true)} }\n`;
-		style += `body.vscode-dark .${key} { color: ${library.get_color(key, false)} }\n`;
-	  }
-  
-	  return style;
+	private _getHtml(content: string): string {
+		return getHtmlForWebview(content, this._view.webview, this._extensionUri.fsPath);
 	}
 }
 
-export { OutPutViewProvider };
+function getHtmlForWebview(content: string, webview: Webview, extensionPath: string): string {
+	const scriptUri = webview.asWebviewUri(Uri.file(path.join(extensionPath, 'media', 'main.js')));
+	const styleVSCodeUri = webview.asWebviewUri(Uri.file(path.join(extensionPath, 'media', 'vscode.css')));
+	return `<!DOCTYPE html>
+		<html>
+			<head>
+				<meta charset="UTF-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<link href="${styleVSCodeUri}" rel="stylesheet" type="text/css">
+				<style>
+				${_getDecorations()}
+				</style>
+				<title>Output</title>
+			</head>
+			<body>
+				${content}
+				<script src="${scriptUri}"></script>
+			</body>
+		</html>`;
+}
+
+function _getDecorations(): string{
+  let style: string = '';
+  for(const key of text_colors){
+	style += `body.vscode-light .${key} { color: ${library.get_color(key, true)} }\n`;
+	style += `body.vscode-dark .${key} { color: ${library.get_color(key, false)} }\n`;
+  }
+
+  return style;
+}
+
+export { OutPutViewProvider, getHtmlForWebview };
