@@ -13,6 +13,7 @@ import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-lan
 import { registerAbbreviations } from './abbreviations';
 import { IsabelleFSP } from './isabelle_filesystem/isabelleFSP';
 import { OutPutViewProvider } from './output_view';
+import { registerScriptDecorations } from './script_decorations';
 
 
 let last_caret_update: protocol.Caret_Update = {}
@@ -80,6 +81,12 @@ export function activate(context: ExtensionContext)
 
     language_client.onReady().then(() =>
       language_client.onNotification(protocol.decoration_type, decorations.apply_decoration))
+
+
+    /* super-/subscript decorations */
+
+    registerScriptDecorations(context);
+
 
 
     /* caret handling */
