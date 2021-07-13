@@ -35,15 +35,7 @@ class OutPutViewProvider implements WebviewViewProvider {
 		webviewView.webview.html = this._getHtml(this.content);
 		webviewView.webview.onDidReceiveMessage(async message => {
 			if (message.command === "open") {
-				const uri = Uri.parse(message.link);
-				const line = Number(uri.fragment) || 0;
-				const pos = new Position(line, 0);
-				const uriNoFragment = uri.with({ fragment: '' }).toString();
-				const isabelleUri = IsabelleFSP.getIsabelleUri(uriNoFragment);
-				window.showTextDocument(Uri.parse(isabelleUri), {
-					preserveFocus: false,
-					selection: new Selection(pos,pos)
-				});
+				webviewLinkOpen(message.link);
 			}
 		});
 	}
@@ -60,6 +52,18 @@ class OutPutViewProvider implements WebviewViewProvider {
 	private _getHtml(content: string): string {
 		return getHtmlForWebview(content, this._view.webview, this._extensionUri.fsPath);
 	}
+}
+
+function webviewLinkOpen(link: string) {
+	const uri = Uri.parse(link);
+	const line = Number(uri.fragment) || 0;
+	const pos = new Position(line, 0);
+	const uriNoFragment = uri.with({ fragment: '' }).toString();
+	const isabelleUri = IsabelleFSP.getIsabelleUri(uriNoFragment);
+	window.showTextDocument(Uri.parse(isabelleUri), {
+		preserveFocus: false,
+		selection: new Selection(pos, pos)
+	});
 }
 
 function getHtmlForWebview(content: string, webview: Webview, extensionPath: string): string {
@@ -93,4 +97,4 @@ function _getDecorations(): string{
   return style;
 }
 
-export { OutPutViewProvider, getHtmlForWebview };
+export { OutPutViewProvider, getHtmlForWebview, webviewLinkOpen };

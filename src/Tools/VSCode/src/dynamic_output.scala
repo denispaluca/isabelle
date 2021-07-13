@@ -48,7 +48,7 @@ object Dynamic_Output
               fileMaybe match {
                   case Some(file) =>
                     //val file = resources.node_file(value)
-                    Some(HTML.link(File.absolute(File.platform_file(Path.explode(file))).toURI.toString + "#" + def_line, body))
+                    Some(HTML.link(Path.explode(file).absolute_file.toURI.toString + "#" + def_line, body))
                   case _ => None
               }
             case _ => None

@@ -6,7 +6,7 @@ import * as path from 'path';
 import { LanguageClient } from 'vscode-languageclient';
 import { Uri, ExtensionContext, window, WebviewPanel, ViewColumn, Webview } from 'vscode'
 import { text_colors } from './decorations';
-import { getHtmlForWebview } from './output_view';
+import { getHtmlForWebview, webviewLinkOpen } from './output_view';
 
 
 let language_client: LanguageClient
@@ -52,15 +52,15 @@ class Panel
             language_client.sendNotification(
               protocol.state_auto_update_type, { id: this.state_id, enabled: message.enabled })
             break;
-
           case 'update':
             language_client.sendNotification(protocol.state_update_type, { id: this.state_id })
             break;
-
           case 'locate':
             language_client.sendNotification(protocol.state_locate_type, { id: this.state_id })
             break;
-
+          case 'open':
+            webviewLinkOpen(message.link);
+            break;
           default:
             break;
         }
