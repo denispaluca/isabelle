@@ -1,16 +1,81 @@
 import { DecorationRangeBehavior, ExtensionContext, Range, 
     TextDocument, TextEditor, window, workspace } from "vscode";
  
-const noHideList = [' ', '\n', '\r', '⇩', '⇧'];
-function indicesOf(char: string, text: string): number[]{
-    let indices: number[] = [];
+const arrows = {
+    sub: '⇩',
+    super: '⇧',
+    subBegin: '⇘',
+    subEnd: '⇙',
+    superBegin: '⇗',
+    superEnd: '⇖'
+}
+const noHideList = [' ', '\n', '\r', ...Object.values(arrows)];
+
+function shouldHide(nextChar: string): boolean{
+    return !noHideList.includes(nextChar);
+}
+
+function findClosing(close: string, text: string, openIndex: number): number | undefined {
+    let closeIndex = openIndex;
+    let counter = 1;
+    const open = text[openIndex];
+    while (counter > 0) {
+        let c = text[++closeIndex];
+
+        if(c === undefined) return;
+
+        if (c === open) {
+            counter++;
+        }
+        else if (c === close) {
+            counter--;
+        }
+    }
+    return closeIndex;
+}
+
+
+
+function extractRanges(doc: TextDocument) {
+    const text = doc.getText();
+    const hideRanges: Range[] = [];
+    const superscriptRanges: Range[] = [];
+    const subscriptRanges: Range[] = [];
+
     for(let i = 0; i < text.length - 1; i++) {
-        if (text[i] === char && !noHideList.includes(text[i + 1])) {
-            indices.push(i);
+        switch (text[i]) {
+            case arrows.super:
+            case arrows.sub:
+                if(shouldHide(text[i + 1])){
+                    const posMid = doc.positionAt(i + 1);
+                    hideRanges.push(new Range(doc.positionAt(i), posMid));
+                    (text[i] === arrows.sub ? subscriptRanges : superscriptRanges)
+                        .push(new Range(posMid, doc.positionAt(i + 2)));
+                    i++;
+                }
+                break;
+            case arrows.superBegin:
+            case arrows.subBegin:
+                const close = text[i] === arrows.subBegin ? arrows.subEnd : arrows.superEnd;
+                const scriptRanges = text[i] === arrows.subBegin ? subscriptRanges : superscriptRanges;
+                const closeIndex = findClosing(close, text, i);
+                if(closeIndex && closeIndex - i > 1){
+                    const posStart = doc.positionAt(i + 1);
+                    const posEnd = doc.positionAt(closeIndex);
+                    hideRanges.push(
+                        new Range(doc.positionAt(i), posStart),
+                        new Range(posEnd, doc.positionAt(closeIndex + 1))
+                    );
+                    scriptRanges.push(new Range(posStart, posEnd));
+                    i = closeIndex;
+                }
+                break;
+            default:
+                break;
         }
     }
 
-    return indices;
+    return { hideRanges, superscriptRanges, subscriptRanges };
 }
 
 export function registerScriptDecorations(context: ExtensionContext){
@@ -57,27 +122,4 @@ export function registerScriptDecorations(context: ExtensionContext){
             }
         })
     );
-}
-
-function extractRanges(doc: TextDocument) {
-    const text = doc.getText();
-    const superscriptIndices = indicesOf('⇧', text);
-    const subscriptIndices = indicesOf('⇩', text);
-
-    const hideRanges: Range[] = [];
-    const superscriptRanges: Range[] = [];
-    const subscriptRanges: Range[] = [];
-
-    for (const index of superscriptIndices) {
-        const posMid = doc.positionAt(index + 1);
-        hideRanges.push(new Range(doc.positionAt(index), posMid));
-        superscriptRanges.push(new Range(posMid, doc.positionAt(index + 2)));
-    }
-
-    for (const index of subscriptIndices) {
-        const posMid = doc.positionAt(index + 1);
-        hideRanges.push(new Range(doc.positionAt(index), posMid));
-        subscriptRanges.push(new Range(posMid, doc.positionAt(index + 2)));
-    }
-    return { hideRanges, superscriptRanges, subscriptRanges };
 }
