@@ -67,17 +67,18 @@ export class IsabelleFSP implements FileSystemProvider {
             ),
 
             workspace.onDidOpenTextDocument((d) => {
-                if (d.uri.scheme === this.scheme) {
-                    this.instance.prepareTheory(d);
-                    return;
-                }
                 this.instance.decideToCreate(d.uri, d.languageId);
             }),
 
             window.onDidChangeActiveTextEditor(async editor => {
                 if(!editor) return;
 
-                const document = editor.document;
+                const { document } = editor;
+                if (document.uri.scheme === this.scheme) {
+                    this.instance.prepareTheory(document);
+                    return;
+                }
+
                 const newUri = await this.instance.decideToCreate(document.uri, document.languageId);
 
                 if (!newUri) return;
@@ -199,6 +200,12 @@ export class IsabelleFSP implements FileSystemProvider {
     private syncDeletion(uri: Uri) {
         const isabelleFile = uri.toString();
         const file = this.isabelleToFile.get(isabelleFile);
+        if(!file) return;
+        const session = this.sessionTheories.find(s => s.theories.includes(file));
+        if(session){
+            session.theories = session.theories.filter(t => t !== file);
+            IsabelleFSP.state.set(StateKey.sessions, this.sessionTheories);
+        }
         this.isabelleToFile.delete(isabelleFile);
         this.fileToIsabelle.delete(file);
     }
@@ -420,6 +427,8 @@ export class IsabelleFSP implements FileSystemProvider {
             this._delete(uri);
             if(parent.size === 0){
                 this._delete(parentUri);
+                this.sessionTheories = this.sessionTheories.filter(s => s.session_name !== 'Draft');
+                IsabelleFSP.state.set(StateKey.sessions, this.sessionTheories);
             }
             return;
         }
