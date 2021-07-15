@@ -312,7 +312,7 @@ export class IsabelleFSP implements FileSystemProvider {
         }
 
         const basename = path.posix.basename(uri.path);
-        const parent = this._lookupParentDirectory(uri);
+        const [parent, parentUri] = this._getParentData(uri);
         let entry = parent.entries.get(basename);
         if (entry instanceof Directory) {
             throw FileSystemError.FileIsADirectory(uri);
@@ -339,11 +339,17 @@ export class IsabelleFSP implements FileSystemProvider {
         }
 
         entry = new File(basename);
-        parent.entries.set(basename, entry);
         entry.mtime = Date.now();
         entry.size = content.byteLength;
         entry.data = content;
-        this._fireSoon({ type: FileChangeType.Created, uri });
+
+        parent.entries.set(basename, entry);
+        parent.mtime = Date.now();
+        parent.size++;
+        this._fireSoon(
+            { type: FileChangeType.Changed, uri: parentUri }, 
+            { type: FileChangeType.Created, uri }
+        );
     }
 
     // --- manage files/folders
@@ -369,6 +375,15 @@ export class IsabelleFSP implements FileSystemProvider {
     }
 
     delete(uri: Uri): void {
+        const [parent, parentUri] = this._getParentData(uri)
+        if(parent && parent.name === 'Draft'){
+            this._delete(uri);
+            if(parent.size === 0){
+                this._delete(parentUri);
+            }
+            return;
+        }
+
         throw FileSystemError.NoPermissions("No permission to delete on Isabelle File System");
         //In case it needs to be reactivated
         this._delete(uri);
@@ -376,20 +391,29 @@ export class IsabelleFSP implements FileSystemProvider {
 
     private _createDirectory(uri: Uri): void {
         const basename = path.posix.basename(uri.path);
-        const dirname = uri.with({ path: path.posix.dirname(uri.path) });
-        const parent = this._lookupAsDirectory(dirname, false);
+        const [parent, parentUri] = this._getParentData(uri);
 
         const entry = new Directory(basename);
         parent.entries.set(entry.name, entry);
         parent.mtime = Date.now();
         parent.size += 1;
-        this._fireSoon({ type: FileChangeType.Changed, uri: dirname }, { type: FileChangeType.Created, uri });
+        this._fireSoon(
+            { type: FileChangeType.Changed, uri: parentUri }, 
+            { type: FileChangeType.Created, uri }
+        );
     }
 
     createDirectory(uri: Uri): void {
         throw FileSystemError.NoPermissions("No permission to create on Isabelle File System");
         //In case it needs to be reactivated
         this._createDirectory(uri);
+    }
+
+    private _getParentData(uri: Uri): [Directory, Uri] {
+        const parentUri = uri.with({ path: path.posix.dirname(uri.path) });
+        const parent = this._lookupAsDirectory(parentUri, false);
+
+        return [parent, parentUri];
     }
 
     // --- lookup
