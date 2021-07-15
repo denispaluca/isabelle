@@ -6,6 +6,7 @@ import {
 import * as path from 'path';
 import { SymbolEncoder, SymbolEntry } from "./symbol_encoder";
 import { SessionTheories } from "../protocol";
+import { WorkspaceState, StateKey } from "./workspaceState";
 
 export class File implements FileStat {
 
@@ -54,10 +55,11 @@ export class IsabelleFSP implements FileSystemProvider {
     public static readonly scheme = 'isabelle';
     private static symbolEncoder: SymbolEncoder;
     private static instance: IsabelleFSP;
+    private static state: WorkspaceState;
 
-    public static register(context: ExtensionContext): string {
+    public static async register(context: ExtensionContext): Promise<string> {
         this.instance = new IsabelleFSP();
-
+        this.state = new WorkspaceState(context);
         context.subscriptions.push(
             workspace.registerFileSystemProvider(
                 this.scheme,
@@ -108,18 +110,12 @@ export class IsabelleFSP implements FileSystemProvider {
             )
         );
 
-        workspace.updateWorkspaceFolders(0, 0,
-            {
-                uri: Uri.parse(`${IsabelleFSP.scheme}:/`),
-                name: "Isabelle - Theories"
-            }
-        );
-
-        return workspace.workspaceFolders[1].uri.fsPath;
+        return await this.instance.setupWorkspace();
     }
 
     public static updateSymbolEncoder(entries: SymbolEntry[]) {
         this.symbolEncoder = new SymbolEncoder(entries);
+        this.state.set(StateKey.symbolEntries, entries);
     }
 
     public static getFileUri(isabelleUri: string): string {
@@ -141,6 +137,32 @@ export class IsabelleFSP implements FileSystemProvider {
     private isabelleToFile = new Map<string, string>();
     private fileToIsabelle = new Map<string, string>();
     private sessionTheories: SessionTheories[] = [];
+
+    private async setupWorkspace(): Promise<string> {
+        const { state } = IsabelleFSP;
+        let { sessions, discFolder, symbolEntries} = state.getSetupData();
+        const mainFolderUri = Uri.parse(`${IsabelleFSP.scheme}:/`);
+
+        if(workspace.workspaceFolders[0].uri.toString() !== mainFolderUri.toString()){
+            workspace.updateWorkspaceFolders(0, 0,
+                {
+                    uri: mainFolderUri,
+                    name: "Isabelle - Theories"
+                }
+            );
+        }
+        
+        if(sessions && discFolder && symbolEntries){
+            IsabelleFSP.updateSymbolEncoder(symbolEntries);
+            await this.init(sessions);
+            return discFolder;
+        }
+        
+        
+        discFolder = workspace.workspaceFolders[1].uri.fsPath;
+        state.set(StateKey.discFolder, discFolder);
+        return discFolder;
+    }
 
     private syncFromOriginal(): Disposable {
         const watcher = workspace.createFileSystemWatcher("**/*.thy");
@@ -199,23 +221,29 @@ export class IsabelleFSP implements FileSystemProvider {
     }
 
     private resetWorkspace() {
-        this.isabelleToFile.clear();
-        this.fileToIsabelle.clear();
-        this.root.entries.clear();
+        for(const key of this.root.entries.keys()){
+            if(key === 'Draft') continue;
+
+            this._delete(Uri.parse(`${IsabelleFSP.scheme}:/${key}`), true);
+        }
+
+        this.sessionTheories = this.sessionTheories.filter(v => v.session_name === 'Draft');
     }
+
     private async init(sessions: SessionTheories[]) {
         this.resetWorkspace();
-        this.sessionTheories = sessions.map(({ session_name, theories }) => ({
+        this.sessionTheories.push(...sessions.map(({ session_name, theories }) => ({
             session_name,
             theories: theories.map(t => Uri.parse(t).toString())
-        }));
+        })));
+        IsabelleFSP.state.set(StateKey.sessions, this.sessionTheories);
 
-        for (const { session_name } of sessions) {
+        for (const { session_name } of this.sessionTheories) {
             if (!session_name) continue;
             this._createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${session_name}`));
         }
 
-        const promises = sessions.map(
+        const promises = this.sessionTheories.map(
             ({ session_name, theories }) => theories.map(
                 s => this.createFromOriginal(Uri.parse(s), session_name)
             )
@@ -244,12 +272,19 @@ export class IsabelleFSP implements FileSystemProvider {
     }
 
     public getTheorySession(uri: string): string {
-        const session = this.sessionTheories.find((s) => s.theories.includes(uri));
+        let session = this.sessionTheories.find((s) => s.theories.includes(uri));
         if (!session) {
             if(!this.root.entries.get('Draft')){
-                this._createDirectory(Uri.parse(IsabelleFSP.scheme + ':/Draft'))
+                this._createDirectory(Uri.parse(IsabelleFSP.scheme + ':/Draft'));
+                this.sessionTheories.push({
+                    session_name: 'Draft',
+                    theories: []
+                });
             }
-            return 'Draft';
+
+            session = this.sessionTheories.find((s) => s.session_name === 'Draft');
+            session.theories.push(uri);
+            IsabelleFSP.state.set(StateKey.sessions, this.sessionTheories);
         }
 
         return session.session_name;
@@ -358,12 +393,17 @@ export class IsabelleFSP implements FileSystemProvider {
         throw FileSystemError.NoPermissions("No permission to rename on Isabelle File System");
     }
 
-    private _delete(uri: Uri): void {
+    private _delete(uri: Uri, silent: boolean = false): void {
         const dirname = uri.with({ path: path.posix.dirname(uri.path) });
         const basename = path.posix.basename(uri.path);
-        const parent = this._lookupAsDirectory(dirname, false);
+        const parent = this._lookupAsDirectory(dirname, silent);
+        
+        if(!parent) return;
         if (!parent.entries.has(basename)) {
-            throw FileSystemError.FileNotFound(uri);
+            if(!silent)
+                throw FileSystemError.FileNotFound(uri);
+            else 
+                return;
         }
         parent.entries.delete(basename);
         parent.mtime = Date.now();

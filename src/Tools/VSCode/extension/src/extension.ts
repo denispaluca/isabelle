@@ -18,7 +18,7 @@ import { registerScriptDecorations } from './script_decorations';
 
 let last_caret_update: protocol.Caret_Update = {}
 
-export function activate(context: ExtensionContext)
+export async function activate(context: ExtensionContext)
 {
   const isabelle_home = library.get_configuration<string>("home")
   const isabelle_args = library.get_configuration<Array<string>>("args")
@@ -30,7 +30,7 @@ export function activate(context: ExtensionContext)
   if (isabelle_home === "")
     window.showErrorMessage("Missing user settings: isabelle.home")
   else {
-    const discFolder = IsabelleFSP.register(context);
+    const discFolder = await IsabelleFSP.register(context);
     const isabelle_tool = isabelle_home + "/bin/isabelle"
     const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions", 
     '-D', discFolder
