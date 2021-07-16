@@ -233,13 +233,29 @@ export class IsabelleFSP implements FileSystemProvider {
         }
     }
 
-    private syncDeletion(uri: Uri) {
-        const isabelleFile = uri.toString();
-        const file = this.isabelleToFile.get(isabelleFile);
-        this.isabelleToFile.delete(isabelleFile);
-        this.fileToIsabelle.delete(file);
+    private syncDeletion(uri: Uri, silent: boolean) {
+        const dir = this._lookup(uri, silent);
+        if(!dir){
+            if(silent)
+                return;
+            else
+                throw FileSystemError.FileNotFound(uri);
+        }
+
+        const uriString = uri.toString();
+        if(dir instanceof Directory){
+            for(const key of dir.entries.keys()){
+                this.removeMapping(uriString + `/${key}`);
+            }
+        }
+        this.removeMapping(uriString);
     }
 
+    private removeMapping(uri: string) {
+        const file = this.isabelleToFile.get(uri);
+        this.isabelleToFile.delete(uri);
+        this.fileToIsabelle.delete(file);
+    }
 
     private async reloadFile(fileUri: Uri) {
         const isabelleFile = this.fileToIsabelle.get(fileUri.toString());
@@ -257,33 +273,38 @@ export class IsabelleFSP implements FileSystemProvider {
         this.init(this.sessionTheories);
     }
 
-    private resetWorkspace() {
-        for(const key of this.root.entries.keys()){
-            if(key === 'Draft') continue;
+    private async init(sessions: SessionTheories[]) {
+        const sessionNames = sessions.map(s => s.session_name);
+        const rootEntries = Array.from(this.root.entries.keys());
+        for(const key of rootEntries){
+            if(key === 'Draft' || sessionNames.includes(key)) 
+                continue;
 
             this._delete(Uri.parse(`${IsabelleFSP.scheme}:/${key}`), true);
         }
 
-        this.sessionTheories = this.sessionTheories.filter(v => v.session_name === 'Draft');
-    }
+        for(const { session_name, theories } of sessions){
+            if(!session_name) continue;
+            if(session_name !== 'Draft') {
+                this.sessionTheories.push({
+                    session_name,
+                    theories: theories.map(t => Uri.parse(t).toString())
+                });
+            }
 
-    private async init(sessions: SessionTheories[]) {
-        this.resetWorkspace();
-        this.sessionTheories.push(...sessions.map(({ session_name, theories }) => ({
-            session_name,
-            theories: theories.map(t => Uri.parse(t).toString())
-        })));
-
-        for (const { session_name } of this.sessionTheories) {
-            if (!session_name) continue;
-            this._createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${session_name}`));
+            if(!rootEntries.includes(session_name)){
+                this._createDirectory(Uri.parse(`${IsabelleFSP.scheme}:/${session_name}`));
+            }
         }
 
-        const promises = this.sessionTheories.map(
+        const promises = sessions.map(
             ({ session_name, theories }) => theories.map(
                 async s => {
                     try{
-                        return await this.createFromOriginal(Uri.parse(s), session_name)
+                        if(session_name)
+                            return await this.createFromOriginal(Uri.parse(s), session_name);
+                        else 
+                            return Promise.resolve();
                     } catch {
                         return Promise.resolve();
                     }
@@ -441,11 +462,11 @@ export class IsabelleFSP implements FileSystemProvider {
             else 
                 return;
         }
+
+        this.syncDeletion(uri, silent);
         parent.entries.delete(basename);
         parent.mtime = Date.now();
         parent.size -= 1;
-
-        this.syncDeletion(uri);
 
         this._fireSoon({ type: FileChangeType.Changed, uri: dirname }, { uri, type: FileChangeType.Deleted });
     }
@@ -453,10 +474,12 @@ export class IsabelleFSP implements FileSystemProvider {
     delete(uri: Uri): void {
         const [parent, parentUri] = this._getParentData(uri)
         if(parent && parent.name === 'Draft'){
-            this._delete(uri);
-            if(parent.size === 0){
+            if(parent.size === 1){
                 this._delete(parentUri);
+                return;
             }
+
+            this._delete(uri);
             return;
         }
 
