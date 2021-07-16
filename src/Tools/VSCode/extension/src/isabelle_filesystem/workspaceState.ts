@@ -37,8 +37,8 @@ class WorkspaceState {
         return this.context.workspaceState.get(key);
     }
 
-    public set(key: StateKey, value: any) {
-        this.context.workspaceState.update(key, value);
+    public async set(key: StateKey, value: any) {
+        await this.context.workspaceState.update(key, value);
     }
 }
 

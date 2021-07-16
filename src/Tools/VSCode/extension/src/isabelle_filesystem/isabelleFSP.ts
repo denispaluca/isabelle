@@ -139,6 +139,33 @@ export class IsabelleFSP implements FileSystemProvider {
     private fileToIsabelle = new Map<string, string>();
     private sessionTheories: SessionTheories[] = [];
 
+
+    private async saveTreeState() {
+        const sessions: SessionTheories[] = [];
+        for(const [session_name, val] of this.root.entries){
+            if(!(val instanceof Directory)) return;
+            const theories: string[] = [];
+
+            for(const fileName of val.entries.keys()){
+                theories.push(
+                    this.isabelleToFile.get(
+                        Uri.parse(
+                            `${IsabelleFSP.scheme}:/${session_name}/${fileName}`
+                        ).toString()
+                    )
+                )
+            }
+
+            sessions.push({
+                session_name,
+                theories
+            });
+        }
+
+        IsabelleFSP.state.set(StateKey.sessions, sessions);
+    }
+
+
     private async setupWorkspace(): Promise<string> {
         const { state } = IsabelleFSP;
         let { sessions, discFolder, symbolEntries} = state.getSetupData();
@@ -156,12 +183,21 @@ export class IsabelleFSP implements FileSystemProvider {
         if(sessions && discFolder && symbolEntries){
             IsabelleFSP.updateSymbolEncoder(symbolEntries);
             await this.init(sessions);
-            return discFolder;
+        } else {
+            discFolder = workspace.workspaceFolders[1].uri.fsPath;
         }
         
         
-        discFolder = workspace.workspaceFolders[1].uri.fsPath;
         state.set(StateKey.discFolder, discFolder);
+        this.saveTreeState();
+        this.onDidChangeFile(events => {
+            for(const e of events){
+                if(e.type === FileChangeType.Changed) continue;
+
+                this.saveTreeState();
+                return;
+            }
+        })
         return discFolder;
     }
 
@@ -200,12 +236,6 @@ export class IsabelleFSP implements FileSystemProvider {
     private syncDeletion(uri: Uri) {
         const isabelleFile = uri.toString();
         const file = this.isabelleToFile.get(isabelleFile);
-        if(!file) return;
-        const session = this.sessionTheories.find(s => s.theories.includes(file));
-        if(session){
-            session.theories = session.theories.filter(t => t !== file);
-            IsabelleFSP.state.set(StateKey.sessions, this.sessionTheories);
-        }
         this.isabelleToFile.delete(isabelleFile);
         this.fileToIsabelle.delete(file);
     }
@@ -243,7 +273,6 @@ export class IsabelleFSP implements FileSystemProvider {
             session_name,
             theories: theories.map(t => Uri.parse(t).toString())
         })));
-        IsabelleFSP.state.set(StateKey.sessions, this.sessionTheories);
 
         for (const { session_name } of this.sessionTheories) {
             if (!session_name) continue;
@@ -252,7 +281,13 @@ export class IsabelleFSP implements FileSystemProvider {
 
         const promises = this.sessionTheories.map(
             ({ session_name, theories }) => theories.map(
-                s => this.createFromOriginal(Uri.parse(s), session_name)
+                async s => {
+                    try{
+                        return await this.createFromOriginal(Uri.parse(s), session_name)
+                    } catch {
+                        return Promise.resolve();
+                    }
+                }
             )
         ).reduce((x, y) => x.concat(y), []);
 
@@ -283,15 +318,9 @@ export class IsabelleFSP implements FileSystemProvider {
         if (!session) {
             if(!this.root.entries.get('Draft')){
                 this._createDirectory(Uri.parse(IsabelleFSP.scheme + ':/Draft'));
-                this.sessionTheories.push({
-                    session_name: 'Draft',
-                    theories: []
-                });
             }
-
-            session = this.sessionTheories.find((s) => s.session_name === 'Draft');
-            session.theories.push(uri);
-            IsabelleFSP.state.set(StateKey.sessions, this.sessionTheories);
+            
+            return 'Draft';
         }
 
         return session.session_name;
@@ -427,8 +456,6 @@ export class IsabelleFSP implements FileSystemProvider {
             this._delete(uri);
             if(parent.size === 0){
                 this._delete(parentUri);
-                this.sessionTheories = this.sessionTheories.filter(s => s.session_name !== 'Draft');
-                IsabelleFSP.state.set(StateKey.sessions, this.sessionTheories);
             }
             return;
         }
