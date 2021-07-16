@@ -29,6 +29,24 @@
     ],
     "main": "./out/src/extension",
     "contributes": {
+		"viewsContainers": {
+		  "panel": [
+			{
+			  "id": "isabelle",
+			  "title": "Isabelle",
+			  "icon": ""
+			}
+		  ]
+		},
+		"views": {
+			"isabelle": [
+				{
+					"type": "webview",
+					"id": "isabelle-output",
+					"name": "Output"
+				}
+			]
+		},
         "commands": [
             {
                 "command": "isabelle.reload-workspace",

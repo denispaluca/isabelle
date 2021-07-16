@@ -64,9 +64,28 @@ class State_Panel private(val server: Language_Server)
       (snapshot, results, body) =>
         if (output_active.value) {
           if(body.nonEmpty){
+            val elements3: Presentation.Elements =
+              Presentation.Elements(
+                html = Presentation.elements2.html,
+                language = Presentation.elements2.language,
+                entity = Markup.Elements.full)
+
+            def entity_link(props: Properties.T, body: XML.Body): Option[XML.Tree] =
+              (props, props) match {
+                case (Position.Def_File(thy_file), Position.Def_Line(def_line)) =>
+                  val fileMaybe = server.resources.source_file(thy_file)
+                  fileMaybe match {
+                      case Some(file) =>
+                        //val file = resources.node_file(value)
+                        Some(HTML.link(Path.explode(file).absolute_file.toURI.toString + "#" + def_line, body))
+                      case _ => None
+                  }
+                case _ => None
+              }
+
             val htmlBody = Presentation.make_html(
-              Presentation.elements2,
-              (_, _) => None,
+              elements3,
+              entity_link,
               Pretty.separate(body))
 
             output(HTML.source(htmlBody).toString())

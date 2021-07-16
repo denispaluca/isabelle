@@ -12,11 +12,13 @@ import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, wor
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient';
 import { registerAbbreviations } from './abbreviations';
 import { IsabelleFSP } from './isabelle_filesystem/isabelleFSP';
+import { OutPutViewProvider } from './output_view';
+import { registerScriptDecorations } from './script_decorations';
 
 
 let last_caret_update: protocol.Caret_Update = {}
 
-export function activate(context: ExtensionContext)
+export async function activate(context: ExtensionContext)
 {
   const isabelle_home = library.get_configuration<string>("home")
   const isabelle_args = library.get_configuration<Array<string>>("args")
@@ -28,7 +30,7 @@ export function activate(context: ExtensionContext)
   if (isabelle_home === "")
     window.showErrorMessage("Missing user settings: isabelle.home")
   else {
-    const discFolder = IsabelleFSP.register(context);
+    const discFolder = await IsabelleFSP.register(context);
     const isabelle_tool = isabelle_home + "/bin/isabelle"
     const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions", 
     '-D', discFolder
@@ -79,6 +81,12 @@ export function activate(context: ExtensionContext)
 
     language_client.onReady().then(() =>
       language_client.onNotification(protocol.decoration_type, decorations.apply_decoration))
+
+
+    /* super-/subscript decorations */
+
+    registerScriptDecorations(context);
+
 
 
     /* caret handling */
@@ -133,16 +141,22 @@ export function activate(context: ExtensionContext)
 
 
     /* dynamic output */
-
-    const dynamic_output = window.createOutputChannel("Isabelle Output")
-    context.subscriptions.push(dynamic_output)
-    dynamic_output.show(true)
-    dynamic_output.hide()
+    const provider = new OutPutViewProvider(context.extensionUri);
+    context.subscriptions.push(
+      window.registerWebviewViewProvider(OutPutViewProvider.viewType, provider));
+    // const dynamic_output = window.createOutputChannel("Isabelle Output")
+    // context.subscriptions.push(dynamic_output)
+    // dynamic_output.show(true)
+    // dynamic_output.hide()
 
     language_client.onReady().then(() =>
     {
       language_client.onNotification(protocol.dynamic_output_type,
-        params => { dynamic_output.clear(); dynamic_output.appendLine(params.content) })
+        params => { 
+          provider.updateContent(params.content);
+          // dynamic_output.clear(); 
+          // dynamic_output.appendLine(params.content) 
+        })
     })
 
 
