@@ -326,14 +326,9 @@ export class IsabelleFSP implements FileSystemProvider {
                 path.posix.join('/', sessionName, path.basename(uri.fsPath, '.thy') + base)
             );
 
-            const isabelleUri = this.fileToIsabelle.get(newUri.toString());
-            if(!isabelleUri) {
+            const oldUri = this.isabelleToFile.get(newUri.toString());
+            if(!oldUri || oldUri === uri.toString()) {
                 return newUri;
-            } else {
-                const currFile = this.isabelleToFile.get(isabelleUri);
-                if(currFile === uri.toString()){
-                    return newUri;
-                }
             }
 
             if(fsPath === '/') {
