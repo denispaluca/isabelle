@@ -315,13 +315,35 @@ export class IsabelleFSP implements FileSystemProvider {
         await Promise.all(promises);
     }
 
+    private createNewUri(uri: Uri, sessionName: string){
+        let newUri: Uri;
+        let extra = '';
+        let fsPath = uri.fsPath;
+        while(true){
+            const base = extra ? ` (${extra})` : '';
+            newUri = Uri.parse(
+                IsabelleFSP.scheme + ':' +
+                path.posix.join('/', sessionName, path.basename(uri.fsPath, '.thy') + base)
+            );
+
+            const oldUri = this.isabelleToFile.get(newUri.toString());
+            if(!oldUri || oldUri === uri.toString()) {
+                return newUri;
+            }
+
+            if(fsPath === '/') {
+                throw FileSystemError.FileExists(newUri);
+            }
+
+            fsPath = path.posix.dirname(fsPath);
+            extra = path.posix.join(path.posix.basename(fsPath), extra);
+        }
+    }
+
     public async createFromOriginal(uri: Uri, sessionName: string): Promise<Uri> {
         const data = await workspace.fs.readFile(uri);
 
-        const newUri = Uri.parse(
-            IsabelleFSP.scheme + ':' +
-            path.posix.join('/', sessionName, path.basename(uri.fsPath, '.thy'))
-        );
+        const newUri = this.createNewUri(uri, sessionName);
         const encodedData = IsabelleFSP.symbolEncoder.encode(data);
 
         const isabelleFile = newUri.toString();
