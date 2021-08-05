@@ -52,7 +52,7 @@ class State_Panel private(val server: Language_Server)
   val id: Counter.ID = State_Panel.make_id()
 
   private def output(content: String): Unit =
-    server.channel.write(LSP.State_Output(id, content))
+    server.channel.write(LSP.State_Output(id, content, auto_update_enabled.value))
 
 
   /* query operation */
@@ -63,15 +63,33 @@ class State_Panel private(val server: Language_Server)
     new Query_Operation(server.editor, (), "print_state", _ => (),
       (snapshot, results, body) =>
         if (output_active.value) {
-          val text = server.resources.output_pretty_message(Pretty.separate(body))
-          val content =
-            HTML.output_document(
-              List(HTML.style(HTML.fonts_css()),
-                HTML.style_file(HTML.isabelle_css),
-                HTML.script(controls_script)),
-              List(controls, HTML.source(text)),
-              css = "", structural = true)
-          output(content)
+          if(body.nonEmpty){
+            val elements3: Presentation.Elements =
+              Presentation.Elements(
+                html = Presentation.elements2.html,
+                language = Presentation.elements2.language,
+                entity = Markup.Elements.full)
+
+            def entity_link(props: Properties.T, body: XML.Body): Option[XML.Tree] =
+              (props, props) match {
+                case (Position.Def_File(thy_file), Position.Def_Line(def_line)) =>
+                  val fileMaybe = server.resources.source_file(thy_file)
+                  fileMaybe match {
+                      case Some(file) =>
+                        //val file = resources.node_file(value)
+                        Some(HTML.link(Path.explode(file).absolute_file.toURI.toString + "#" + def_line, body))
+                      case _ => None
+                  }
+                case _ => None
+              }
+
+            val htmlBody = Presentation.make_html(
+              elements3,
+              entity_link,
+              Pretty.separate(body))
+
+            output(HTML.source(htmlBody).toString())
+          }
         })
 
   def locate(): Unit = print_state.locate_query()
@@ -104,44 +122,6 @@ class State_Panel private(val server: Language_Server)
     if (enabled) update()
   }
 
-
-  /* controls */
-
-  private def controls_script =
-"""
-const vscode = acquireVsCodeApi();
-
-function invoke_auto_update(enabled)
-{ vscode.postMessage({'command': 'auto_update', 'enabled': enabled}) }
-
-function invoke_update()
-{ vscode.postMessage({'command': 'update'}) }
-
-function invoke_locate()
-{ vscode.postMessage({'command': 'locate'}) }
-"""
-
-  private def auto_update_button: XML.Elem =
-    HTML.GUI.checkbox(HTML.text("Auto update"),
-      name = "auto_update",
-      tooltip = "Indicate automatic update following cursor movement",
-      selected = auto_update_enabled.value,
-      script = "invoke_auto_update(this.checked)")
-
-  private def update_button: XML.Elem =
-    HTML.GUI.button(List(HTML.bold(HTML.text("Update"))),
-      name = "update",
-      tooltip = "Update display according to the command at cursor position",
-      script = "invoke_update()")
-
-  private def locate_button: XML.Elem =
-    HTML.GUI.button(HTML.text("Locate"),
-      name = "locate",
-      tooltip = "Locate printed command within source text",
-      script = "invoke_locate()")
-
-  private def controls: XML.Elem =
-    HTML.Wrap_Panel(List(auto_update_button, update_button, locate_button))
 
 
   /* main */

@@ -36,6 +36,7 @@ object Language_Server
         var log_file: Option[Path] = None
         var logic_requirements = false
         var dirs: List[Path] = Nil
+        var select_dirs: List[Path] = Nil
         var include_sessions: List[String] = Nil
         var logic = default_logic
         var modes: List[String] = Nil
@@ -50,6 +51,7 @@ Usage: isabelle vscode_server [OPTIONS]
     -L FILE      logging on FILE
     -R NAME      build image with requirements from other sessions
     -d DIR       include session directory
+    -D DIR       include session directory and select its sessions
     -i NAME      include session in name-space of theories
     -l NAME      logic session name (default ISABELLE_LOGIC=""" + quote(default_logic) + """)
     -m MODE      add print mode for output
@@ -62,6 +64,7 @@ Usage: isabelle vscode_server [OPTIONS]
           "L:" -> (arg => log_file = Some(Path.explode(File.standard_path(arg)))),
           "R:" -> (arg => { logic = arg; logic_requirements = true }),
           "d:" -> (arg => dirs = dirs ::: List(Path.explode(File.standard_path(arg)))),
+          "D:" -> (arg => select_dirs = select_dirs ::: List(Path.explode(File.standard_path(arg)))),
           "i:" -> (arg => include_sessions = include_sessions ::: List(arg)),
           "l:" -> (arg => logic = arg),
           "m:" -> (arg => modes = arg :: modes),
@@ -74,7 +77,7 @@ Usage: isabelle vscode_server [OPTIONS]
         val log = Logger.make(log_file)
         val channel = new Channel(System.in, System.out, log, verbose)
         val server =
-          new Language_Server(channel, options, session_name = logic, session_dirs = dirs,
+          new Language_Server(channel, options, session_name = logic, session_dirs = dirs, select_dirs = select_dirs,
             include_sessions = include_sessions, session_ancestor = logic_ancestor,
             session_requirements = logic_requirements, modes = modes, log = log)
 
@@ -100,6 +103,7 @@ class Language_Server(
   options: Options,
   session_name: String = Language_Server.default_logic,
   session_dirs: List[Path] = Nil,
+  select_dirs: List[Path] = Nil,
   include_sessions: List[String] = Nil,
   session_ancestor: Option[String] = None,
   session_requirements: Boolean = false,
@@ -114,6 +118,20 @@ class Language_Server(
   private val session_ = Synchronized(None: Option[Session])
   def session: Session = session_.value getOrElse error("Server inactive")
   def resources: VSCode_Resources = session.resources.asInstanceOf[VSCode_Resources]
+  private var session_theories = Map[String, List[String]]();
+
+  def load_session_theories(): Unit = {
+    val sessions_structure = Sessions
+      .load_structure(Options.init(), select_dirs = select_dirs)
+      .selection(Sessions.Selection.empty)
+    val bases = Sessions.deps(sessions_structure).session_bases
+    session_theories = for {
+      (name, base) <- bases
+      sources = base
+        .session_theories
+        .map(_.path.absolute_file.toURI.toString)
+    } yield (name, sources)
+  }
 
   def rendering_offset(node_pos: Line.Node_Position): Option[(VSCode_Rendering, Text.Offset)] =
     for {
@@ -263,6 +281,8 @@ class Language_Server(
 
     val try_session =
       try {
+        load_session_theories()
+
         val base_info =
           Sessions.base_info(
             options, session_name, dirs = session_dirs, include_sessions = include_sessions,
@@ -466,6 +486,12 @@ class Language_Server(
           case LSP.State_Auto_Update(id, enabled) => State_Panel.auto_update(id, enabled)
           case LSP.Preview_Request(file, column) => request_preview(file, column)
           case LSP.Symbols_Request(()) => channel.write(LSP.Symbols())
+          case LSP.Session_Theories_Request(reset) => {
+            if(reset){
+              load_session_theories()
+            }
+            channel.write(LSP.Session_Theories(session_theories))
+          }
           case _ => if (!LSP.ResponseMessage.is_empty(json)) log("### IGNORED")
         }
       }

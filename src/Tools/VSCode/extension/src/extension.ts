@@ -1,23 +1,24 @@
 'use strict';
 
 import * as path from 'path';
-import * as fs from 'fs';
 import * as library from './library'
 import * as decorations from './decorations';
 import * as preview_panel from './preview_panel';
 import * as protocol from './protocol';
 import * as state_panel from './state_panel';
-import * as symbol from './symbol';
 import * as completion from './completion';
 import { Uri, TextEditor, ViewColumn, Selection, Position, ExtensionContext, workspace, window,
-  commands, languages } from 'vscode';
-import { LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, TransportKind,
-  NotificationType } from 'vscode-languageclient';
+  commands, languages, ProgressLocation } from 'vscode';
+import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient';
+import { registerAbbreviations } from './abbreviations';
+import { IsabelleFSP } from './isabelle_filesystem/isabelleFSP';
+import { OutPutViewProvider } from './output_view';
+import { registerScriptDecorations } from './script_decorations';
 
 
 let last_caret_update: protocol.Caret_Update = {}
 
-export function activate(context: ExtensionContext)
+export async function activate(context: ExtensionContext)
 {
   const isabelle_home = library.get_configuration<string>("home")
   const isabelle_args = library.get_configuration<Array<string>>("args")
@@ -29,8 +30,11 @@ export function activate(context: ExtensionContext)
   if (isabelle_home === "")
     window.showErrorMessage("Missing user settings: isabelle.home")
   else {
+    const discFolder = await IsabelleFSP.register(context);
     const isabelle_tool = isabelle_home + "/bin/isabelle"
-    const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions"]
+    const standard_args = ["-o", "vscode_unicode_symbols", "-o", "vscode_pide_extensions", 
+    '-D', discFolder, '-d', discFolder
+      /* '-L', '/home/denis/Desktop/logi.log', '-v' */]
 
     const server_options: ServerOptions =
       library.platform_is_windows() ?
@@ -40,17 +44,31 @@ export function activate(context: ExtensionContext)
           args: ["-l", isabelle_tool, "vscode_server"].concat(standard_args, isabelle_args) } :
         { command: isabelle_tool,
           args: ["vscode_server"].concat(standard_args, isabelle_args) };
+          
     const language_client_options: LanguageClientOptions = {
       documentSelector: [
-        { language: "isabelle", scheme: "file" },
+        /* { language: "isabelle", scheme: "file" }, */
+        { language: "isabelle", scheme: IsabelleFSP.scheme },
         { language: "isabelle-ml", scheme: "file" },
         { language: "bibtex", scheme: "file" }
-      ]
+      ],
+      uriConverters: {
+        code2Protocol: uri => IsabelleFSP.getFileUri(uri.toString()),
+        protocol2Code: value => Uri.parse(IsabelleFSP.getIsabelleUri(value))
+      }
     };
 
     const language_client =
       new LanguageClient("Isabelle", server_options, language_client_options, false)
 
+    
+    window.withProgress({location: ProgressLocation.Notification, cancellable: false}, 
+      async (progress) => {
+        progress.report({
+          message: 'Waiting for Isabelle to start...'
+        });
+        return await language_client.onReady();
+    })
 
     /* decorations */
 
@@ -63,6 +81,12 @@ export function activate(context: ExtensionContext)
 
     language_client.onReady().then(() =>
       language_client.onNotification(protocol.decoration_type, decorations.apply_decoration))
+
+
+    /* super-/subscript decorations */
+
+    registerScriptDecorations(context);
+
 
 
     /* caret handling */
@@ -78,8 +102,10 @@ export function activate(context: ExtensionContext)
           caret_update = { uri: uri.toString(), line: cursor.line, character: cursor.character }
       }
       if (last_caret_update !== caret_update) {
-        if (caret_update.uri)
+        if (caret_update.uri){
+          caret_update.uri = IsabelleFSP.getFileUri(caret_update.uri);
           language_client.sendNotification(protocol.caret_update_type, caret_update)
+        }
         last_caret_update = caret_update
       }
     }
@@ -93,6 +119,7 @@ export function activate(context: ExtensionContext)
       }
 
       if (caret_update.uri) {
+        caret_update.uri = IsabelleFSP.getIsabelleUri(caret_update.uri);
         workspace.openTextDocument(Uri.parse(caret_update.uri)).then(document =>
         {
           const editor = library.find_file_editor(document.uri)
@@ -114,16 +141,22 @@ export function activate(context: ExtensionContext)
 
 
     /* dynamic output */
-
-    const dynamic_output = window.createOutputChannel("Isabelle Output")
-    context.subscriptions.push(dynamic_output)
-    dynamic_output.show(true)
-    dynamic_output.hide()
+    const provider = new OutPutViewProvider(context.extensionUri);
+    context.subscriptions.push(
+      window.registerWebviewViewProvider(OutPutViewProvider.viewType, provider));
+    // const dynamic_output = window.createOutputChannel("Isabelle Output")
+    // context.subscriptions.push(dynamic_output)
+    // dynamic_output.show(true)
+    // dynamic_output.hide()
 
     language_client.onReady().then(() =>
     {
       language_client.onNotification(protocol.dynamic_output_type,
-        params => { dynamic_output.clear(); dynamic_output.appendLine(params.content) })
+        params => { 
+          provider.updateContent(params.content);
+          // dynamic_output.clear(); 
+          // dynamic_output.appendLine(params.content) 
+        })
     })
 
 
@@ -148,11 +181,34 @@ export function activate(context: ExtensionContext)
 
     language_client.onReady().then(() =>
     {
+      language_client.onNotification(protocol.session_theories_type,
+        ({entries}) => IsabelleFSP.initWorkspace(entries));
+
       language_client.onNotification(protocol.symbols_type,
-        params => symbol.setup(context, params.entries))
-      language_client.sendNotification(protocol.symbols_request_type)
+        params => {
+          registerAbbreviations(params.entries, context);
+          IsabelleFSP.updateSymbolEncoder(params.entries);
+
+          //request theories to load in isabelle file system 
+          //after a valid symbol encoder is loaded
+          language_client.sendNotification(protocol.session_theories_request_type);
+        });
+
+      language_client.sendNotification(protocol.symbols_request_type);
+
+      //Reset system if changes to ROOT
     })
 
+    const watcher = workspace.createFileSystemWatcher({
+      base: discFolder,
+      pattern: '{ROOT,ROOTS}'
+    }, true, false, true);
+    watcher.onDidChange(() => 
+      language_client.sendNotification(
+        protocol.session_theories_request_type,
+        { reset: true}
+      ));
+    context.subscriptions.push(watcher)
 
     /* completion */
 
@@ -186,5 +242,6 @@ export function activate(context: ExtensionContext)
     context.subscriptions.push(language_client.start())
   }
 }
+
 
 export function deactivate() { }

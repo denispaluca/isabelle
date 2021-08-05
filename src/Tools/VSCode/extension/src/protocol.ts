@@ -1,26 +1,29 @@
 'use strict';
 
-import { Position, Range, MarkedString, DecorationOptions, DecorationRenderOptions } from 'vscode'
+import { MarkdownString } from 'vscode'
 import { NotificationType } from 'vscode-languageclient';
-import * as symbol from './symbol'
-
+import { SymbolEntry } from './isabelle_filesystem/symbol_encoder';
 
 /* decorations */
 
 export interface DecorationOpts {
   range: number[],
-  hover_message?: MarkedString | MarkedString[]
+  hover_message?: MarkdownString | MarkdownString[]
 }
 
 export interface Decoration
 {
-  uri: string,
-  "type": string,
-  content: DecorationOpts[]
+  "type": string;
+  content: DecorationOpts[];
+}
+
+export interface DocumentDecorations {
+  uri: string;
+  entries: Decoration[]
 }
 
 export const decoration_type =
-  new NotificationType<Decoration, void>("PIDE/decoration")
+  new NotificationType<DocumentDecorations, void>("PIDE/decoration")
 
 
 /* caret handling */
@@ -52,8 +55,9 @@ export const dynamic_output_type =
 
 export interface State_Output
 {
-  id: number
-  content: string
+  id: number;
+  content: string;
+  auto_update: boolean;
 }
 
 export const state_output_type =
@@ -105,7 +109,7 @@ export const preview_response_type =
 
 export interface Symbols
 {
-  entries: [symbol.Entry]
+  entries: [SymbolEntry];
 }
 
 export const symbols_type =
@@ -114,6 +118,19 @@ export const symbols_type =
 export const symbols_request_type =
   new NotificationType<void, void>("PIDE/symbols_request")
 
+export interface Entries<T> {
+  entries: T[];
+}
+
+export interface SessionTheories {
+  session_name: string;
+  theories: string[]
+}
+export const session_theories_type =
+  new NotificationType<Entries<SessionTheories>, void>("PIDE/session_theories")
+
+export const session_theories_request_type =
+  new NotificationType<void | { reset: boolean }, void>("PIDE/session_theories_request")
 
 /* spell checker */
 
