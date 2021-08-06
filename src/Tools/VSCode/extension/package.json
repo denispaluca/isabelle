@@ -1,6 +1,6 @@
 {
-    "name": "isabelle-vscode-encode",
-    "displayName": "Isabelle Encode",
+    "name": "isabelle-vscode-startup",
+    "displayName": "Isabelle Startup",
     "description": "Isabelle Prover IDE",
     "keywords": [
         "theorem prover",
@@ -346,7 +346,6 @@
     "dependencies": {
         "@types/vscode": "^1.55.0",
         "path": "^0.12.7",
-        "text-encoding": "^0.7.0",
         "vscode-languageclient": "~5.2.1",
         "vscode-languageserver-types": "~3.16.0",
         "winston": "^3.3.3"
