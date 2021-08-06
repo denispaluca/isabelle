@@ -1,6 +1,6 @@
 {
-    "name": "isabelle-vscode",
-    "displayName": "Isabelle",
+    "name": "isabelle-vscode-encode",
+    "displayName": "Isabelle Encode",
     "description": "Isabelle Prover IDE",
     "keywords": [
         "theorem prover",
@@ -25,28 +25,28 @@
     "activationEvents": [
         "workspaceContains:ROOT",
         "workspaceContains:ROOTS",
-		"onFileSystem:isabelle"
+        "onFileSystem:isabelle"
     ],
     "main": "./out/src/extension",
     "contributes": {
-		"viewsContainers": {
-		  "panel": [
-			{
-			  "id": "isabelle",
-			  "title": "Isabelle",
-			  "icon": ""
-			}
-		  ]
-		},
-		"views": {
-			"isabelle": [
-				{
-					"type": "webview",
-					"id": "isabelle-output",
-					"name": "Output"
-				}
-			]
-		},
+        "viewsContainers": {
+            "panel": [
+                {
+                    "id": "isabelle",
+                    "title": "Isabelle",
+                    "icon": ""
+                }
+            ]
+        },
+        "views": {
+            "isabelle": [
+                {
+                    "type": "webview",
+                    "id": "isabelle-output",
+                    "name": "Output"
+                }
+            ]
+        },
         "commands": [
             {
                 "command": "isabelle.reload-workspace",
@@ -218,7 +218,11 @@
                 "isabelle.replacement": {
                     "type": "string",
                     "default": "non-alpha",
-                    "enum": ["none", "non-alpha", "all"],
+                    "enum": [
+                        "none",
+                        "non-alpha",
+                        "all"
+                    ],
                     "enumDescriptions": [
                         "Replacments are deactivated. No replacments are done.",
                         "Replaces all uniqe abbreviations that contain no alpha numeric characters",
@@ -226,10 +230,10 @@
                     ],
                     "description": "Aggressive replacement mode"
                 },
-                "isabelle.textColor":{
+                "isabelle.textColor": {
                     "type": "object",
                     "additionalProperties": {
-                      "type": "string"
+                        "type": "string"
                     },
                     "default": {
                         "unprocessed_light": "rgba(255, 160, 160, 1.00)",
@@ -324,13 +328,18 @@
         }
     },
     "scripts": {
-        "vscode:prepublish": "tsc -p ./",
+        "vscode:prepublish": "npm run -S esbuild-base -- --minify",
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
+        "esbuild": "npm run -S esbuild-base -- --sourcemap",
+        "esbuild-watch": "npm run -S esbuild-base -- --sourcemap --watch",
+        "test-compile": "tsc -p ./",
         "compile": "tsc -watch -p ./",
         "postinstall": "node ./node_modules/vscode/bin/install"
     },
     "devDependencies": {
         "@types/mocha": "^2.2.48",
         "@types/node": "^10.11.0",
+        "esbuild": "^0.12.18",
         "mocha": "^3.5.3",
         "typescript": "^3.9.9"
     },
@@ -339,6 +348,7 @@
         "path": "^0.12.7",
         "text-encoding": "^0.7.0",
         "vscode-languageclient": "~5.2.1",
-        "vscode-languageserver-types": "~3.16.0"
+        "vscode-languageserver-types": "~3.16.0",
+        "winston": "^3.3.3"
     }
 }
